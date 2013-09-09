@@ -15,13 +15,14 @@ function MerchantFrame_OnLoad(self)
 	PanelTemplates_SetTab(self, 1);
 	
 	MoneyFrame_SetMaxDisplayWidth(MerchantMoneyFrame, 160);
+	
+	UIDropDownMenu_SetWidth(self.lootFilter, 132);
+	UIDropDownMenu_Initialize(self.lootFilter, MerchantFrame_InitFilter);
 end
 
 function MerchantFrame_OnEvent(self, event, ...)
-	if ( event == "MERCHANT_UPDATE" ) then
-		if ( self:IsVisible() ) then
-			MerchantFrame_Update();
-		end
+	if ( event == "MERCHANT_UPDATE" and "MERCHANT_FILTER_ITEM_UPDATE" ) then
+		self.update = true;
 	elseif ( event == "MERCHANT_CLOSED" ) then
 		self:UnregisterEvent("CURRENCY_DISPLAY_UPDATE");
 		HideUIPanel(self);
@@ -49,8 +50,9 @@ function MerchantFrame_OnShow(self)
 	MerchantFrame_UpdateCanRepairAll();
 	MerchantFrame_UpdateGuildBankRepair();
 	PanelTemplates_SetTab(MerchantFrame, 1);
-	MerchantFrame_Update();
+	ResetSetMerchantFilter();
 	
+	MerchantFrame_Update();
 	PlaySound("igCharacterInfoOpen");
 end
 
@@ -67,6 +69,7 @@ function MerchantFrame_OnHide(self)
 end
 
 function MerchantFrame_Update()
+	MerchantFrame_UpdateFilterString()
 	if ( MerchantFrame.selectedTab == 1 ) then
 		MerchantFrame_UpdateMerchantInfo();
 	else
@@ -226,10 +229,7 @@ function MerchantFrame_UpdateMerchantInfo()
 	-- Hide buyback related items
 	MerchantItem11:Hide();
 	MerchantItem12:Hide();
-	BuybackFrameTopLeft:Hide();
-	BuybackFrameTopRight:Hide();
-	BuybackFrameBotLeft:Hide();
-	BuybackFrameBotRight:Hide();
+	BuybackBG:Hide();
 
 	-- Position merchant items
 	MerchantItem3:SetPoint("TOPLEFT", "MerchantItem1", "BOTTOMLEFT", 0, -8);
@@ -278,10 +278,7 @@ function MerchantFrame_UpdateBuybackInfo()
 	-- Show Buyback specific items
 	MerchantItem11:Show();
 	MerchantItem12:Show();
-	BuybackFrameTopLeft:Show();
-	BuybackFrameTopRight:Show();
-	BuybackFrameBotLeft:Show();
-	BuybackFrameBotRight:Show();
+	BuybackBG:Show();
 
 	-- Position buyback items
 	MerchantItem3:SetPoint("TOPLEFT", "MerchantItem1", "BOTTOMLEFT", 0, -15);
@@ -512,16 +509,36 @@ function MerchantFrame_ConfirmExtendedItemCost(itemButton, numToPurchase)
 	
 	local itemName = "YOU HAVE FOUND A BUG!";
 	local itemQuality = 1;
+	local _;
 	local r, g, b = 1, 1, 1;
+	local specs = {};
 	if(itemButton.link) then
 		itemName, _, itemQuality = GetItemInfo(itemButton.link);
 		r, g, b = GetItemQualityColor(itemQuality); 
+		specs = GetItemSpecInfo(itemButton.link, specs);
 	elseif(itemName) then		-- This is the case for a currency, which don't support links yet
 		itemName = itemButton.name;
 		r, g, b = GetItemQualityColor(1); 
 	end
 	
-	StaticPopup_Show("CONFIRM_PURCHASE_TOKEN_ITEM", itemsString, "", {["texture"] = itemButton.texture, ["name"] = itemName, ["color"] = {r, g, b, 1}, ["link"] = itemButton.link, ["index"] = index, ["count"] = numToPurchase});
+	local specText;
+	if (specs and #specs > 0) then
+		local specName, specIcon;
+		specText = "\n\n";
+		for i=1, #specs do
+			_, specName, _, specIcon = GetSpecializationInfoByID(specs[i]);
+			specText = specText.." |T"..specIcon..":0:0:0:-1|t "..NORMAL_FONT_COLOR_CODE..specName..FONT_COLOR_CODE_CLOSE;
+			if (i < #specs) then
+				specText = specText..PLAYER_LIST_DELIMITER
+			end
+		end
+	else
+		specText = "";
+	end
+	
+	StaticPopup_Show("CONFIRM_PURCHASE_TOKEN_ITEM", itemsString, specText, 
+						{["texture"] = itemButton.texture, ["name"] = itemName, ["color"] = {r, g, b, 1}, 
+						["link"] = itemButton.link, ["index"] = index, ["count"] = numToPurchase});
 end
 
 function MerchantFrame_ResetRefundItem()
@@ -578,9 +595,9 @@ function MerchantFrame_UpdateRepairButtons()
 			MerchantRepairItemButton:SetHeight(32);
 			MerchantRepairItemButton:SetPoint("RIGHT", MerchantRepairAllButton, "LEFT", -4, 0);
 
-			MerchantRepairAllButton:SetPoint("BOTTOMRIGHT", MerchantFrame, "BOTTOMLEFT", 115, 89);
+			MerchantRepairAllButton:SetPoint("BOTTOMRIGHT", MerchantFrame, "BOTTOMLEFT", 100, 30);
 			MerchantRepairText:ClearAllPoints();
-			MerchantRepairText:SetPoint("CENTER", MerchantFrame, "BOTTOMLEFT", 97, 129);
+			MerchantRepairText:SetPoint("CENTER", MerchantFrame, "BOTTOMLEFT", 80, 68);
 			MerchantGuildBankRepairButton:Show();
 		else
 			MerchantRepairAllButton:SetWidth(36);
@@ -589,9 +606,9 @@ function MerchantFrame_UpdateRepairButtons()
 			MerchantRepairItemButton:SetHeight(36);
 			MerchantRepairItemButton:SetPoint("RIGHT", MerchantRepairAllButton, "LEFT", -2, 0);
 
-			MerchantRepairAllButton:SetPoint("BOTTOMRIGHT", MerchantFrame, "BOTTOMLEFT", 172, 91);
+			MerchantRepairAllButton:SetPoint("BOTTOMRIGHT", MerchantFrame, "BOTTOMLEFT", 160, 32);
 			MerchantRepairText:ClearAllPoints();
-			MerchantRepairText:SetPoint("BOTTOMLEFT", MerchantFrame, "BOTTOMLEFT", 26, 103);
+			MerchantRepairText:SetPoint("BOTTOMLEFT", MerchantFrame, "BOTTOMLEFT", 14, 45);
 			MerchantGuildBankRepairButton:Hide();
 		end
 		MerchantRepairText:Show();
@@ -610,18 +627,20 @@ function MerchantFrame_UpdateCurrencies()
 	
 	if ( #currencies == 0 ) then	-- common case
 		MerchantFrame:UnregisterEvent("CURRENCY_DISPLAY_UPDATE");
-		MerchantMoneyFrame:SetPoint("BOTTOMRIGHT", -36, 67);
+		MerchantMoneyFrame:SetPoint("BOTTOMRIGHT", -4, 8);
 		MerchantMoneyFrame:Show();
-		MerchantFrameExtraCurrencyTex:Hide();
+		MerchantExtraCurrencyInset:Hide();
+		MerchantExtraCurrencyBg:Hide();
 	else
 		MerchantFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE");
-		MerchantFrameExtraCurrencyTex:Show();
+		MerchantExtraCurrencyInset:Show();
+		MerchantExtraCurrencyBg:Show();
 		MerchantFrame_OrderCurrencies(currencies);
 		local numCurrencies = #currencies;
 		if ( numCurrencies > 3 ) then
 			MerchantMoneyFrame:Hide();
 		else
-			MerchantMoneyFrame:SetPoint("BOTTOMRIGHT", -201, 67);
+			MerchantMoneyFrame:SetPoint("BOTTOMRIGHT", -169, 8);
 			MerchantMoneyFrame:Show();
 		end
 		for index = 1, numCurrencies do
@@ -631,23 +650,23 @@ function MerchantFrame_UpdateCurrencies()
 				tokenButton = CreateFrame("BUTTON", "MerchantToken"..index, MerchantFrame, "BackpackTokenTemplate");
 				-- token display order is: 6 5 4 | 3 2 1
 				if ( index == 1 ) then
-					tokenButton:SetPoint("BOTTOMRIGHT", -48, 67);
+					tokenButton:SetPoint("BOTTOMRIGHT", -16, 8);
 				elseif ( index == 4 ) then
-					tokenButton:SetPoint("BOTTOMLEFT", 121, 67);
+					tokenButton:SetPoint("BOTTOMLEFT", 89, 8);
 				else
 					tokenButton:SetPoint("RIGHT", _G["MerchantToken"..index - 1], "LEFT", 0, 0);
 				end
 				tokenButton:SetScript("OnEnter", MerchantFrame_ShowCurrencyTooltip);
 			end
 
-			name, count, icon = GetCurrencyInfo(currencies[index]);
+			local name, count, icon = GetCurrencyInfo(currencies[index]);
 			if ( name and name ~= "" ) then
 				if ( count <= 99999 ) then
 					tokenButton.count:SetText(count);
 				else
 					tokenButton.count:SetText("*");
 				end
-				tokenButton.icon:SetTexture("Interface\\Icons\\"..icon);
+				tokenButton.icon:SetTexture(icon);
 				tokenButton.currencyID = currencies[index];
 				tokenButton:Show();
 			else
@@ -761,3 +780,72 @@ function MerchantFrame_UpdateCurrencyAmounts()
 		end
 	end
 end
+
+
+function MerchantFrame_SetFilter(self, classIndex)
+	SetMerchantFilter(classIndex);
+	MerchantFrame.page = 1;
+	if MerchantFrame:IsVisible() then
+		MerchantFrame_Update();
+	end
+end
+
+function MerchantFrame_UpdateFilterString()
+	local name = ALL;
+	local currFilter = GetMerchantFilter();
+
+	if currFilter == LE_LOOT_FILTER_CLASS then
+		name = UnitClass("player");
+	elseif currFilter == LE_LOOT_FILTER_BOE then
+		name = ITEM_BIND_ON_EQUIP;
+	elseif currFilter == LE_LOOT_FILTER_ALL then
+		name = ALL;
+	else -- Spec
+		local _, specName, _, icon = GetSpecializationInfo(currFilter - LE_LOOT_FILTER_SPEC1 + 1);
+		name = specName;
+	end
+	
+	UIDropDownMenu_SetText(MerchantFrame.lootFilter, name);
+end
+
+function MerchantFrame_InitFilter()
+	local info = UIDropDownMenu_CreateInfo();
+	local currFilter = GetMerchantFilter();
+	local className = UnitClass("player");
+
+	info.func = MerchantFrame_SetFilter;
+	
+	info.text = className;
+	info.checked = (currFilter ~= LE_LOOT_FILTER_BOE and currFilter ~= LE_LOOT_FILTER_ALL);
+	info.arg1 = LE_LOOT_FILTER_CLASS;
+	UIDropDownMenu_AddButton(info);
+	
+	local numSpecs = GetNumSpecializations();
+	for i = 1, numSpecs do
+		local _, name, _, icon = GetSpecializationInfo(i);
+		info.text = name;
+		info.arg1 = LE_LOOT_FILTER_SPEC1 + i - 1;
+		info.checked = currFilter == (LE_LOOT_FILTER_SPEC1 + i - 1);
+		info.leftPadding = 10;
+		UIDropDownMenu_AddButton(info);
+	end
+
+	info.text = ALL_SPECS;
+	info.checked = currFilter == LE_LOOT_FILTER_CLASS;
+	info.arg1 = LE_LOOT_FILTER_CLASS;
+	info.func = MerchantFrame_SetFilter;
+	UIDropDownMenu_AddButton(info);
+	
+	info.leftPadding = nil;
+	info.text = ITEM_BIND_ON_EQUIP;
+	info.checked = currFilter == LE_LOOT_FILTER_BOE;
+	info.arg1 = LE_LOOT_FILTER_BOE;
+	UIDropDownMenu_AddButton(info);
+	
+	info.leftPadding = nil;
+	info.text = ALL;
+	info.checked = currFilter == LE_LOOT_FILTER_ALL;
+	info.arg1 = LE_LOOT_FILTER_ALL;
+	UIDropDownMenu_AddButton(info);
+end
+

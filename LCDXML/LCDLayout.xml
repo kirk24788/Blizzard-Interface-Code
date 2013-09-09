@@ -1,5 +1,5 @@
-<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
-<!-- ENGLISH -->
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\LCDXML\UI.xsd">
+<!-- FRENCH -->
 	<Screen name="WoWTitleScreen">
 		<!-- DO NOT MODIFY ID!!! -->
 		<LCDText name="WOWTITLE" text="WORLD_OF_WARCRAFT" id="1">
@@ -148,7 +148,7 @@
 			<RelOrigin RelTo="SPELL_POWER" x="33" y="0" />
 		</LCDText>
       <LCDText name="SPELL_HASTE" text="SPELL_HASTE_ABBR" id="53">
-        <Font Size="LG_SMALL" Alignment="LG_LEFT" MaxWidth="28" Wrap="false"/>
+        <Font Size="LG_SMALL" Alignment="LG_LEFT" MaxWidth="33" Wrap="false"/>
         <RelOrigin RelTo="SPELL_POWER" x="0" y="8" />
     </LCDText>
     <LCDText name="SPELL_HASTE_FLD">
@@ -173,7 +173,7 @@
 		</LCDText>
 		
 		<LCDText name="MANA_REGEN" text="MANA_REGEN_ABBR" id="54">
-			<Font Size="LG_SMALL" Alignment="LG_LEFT" MaxWidth="27" Wrap="false"/>
+			<Font Size="LG_SMALL" Alignment="LG_LEFT" MaxWidth="28" Wrap="false"/>
 			<RelOrigin RelTo="SPELL_CRIT" x="0" y="8" />
 		</LCDText>
 		<LCDText name="MANA_REGEN_FLD">

@@ -2,21 +2,23 @@ CHARACTERFRAME_SUBFRAMES = { "PaperDollFrame", "PetPaperDollFrame", "ReputationF
 CHARACTERFRAME_EXPANDED_WIDTH = 540;
 
 local NUM_CHARACTERFRAME_TABS = 4;
-function ToggleCharacter (tab)
+function ToggleCharacter (tab, onlyShow)
 	local subFrame = _G[tab];
 	if ( subFrame ) then
 		if (not subFrame.hidden) then
 			PanelTemplates_SetTab(CharacterFrame, subFrame:GetID());
 			if ( CharacterFrame:IsShown() ) then
 				if ( subFrame:IsShown() ) then
-					HideUIPanel(CharacterFrame);	
+					if ( not onlyShow ) then
+						HideUIPanel(CharacterFrame);	
+					end
 				else
 					PlaySound("igCharacterInfoTab");
 					CharacterFrame_ShowSubFrame(tab);
 				end
 			else
-				ShowUIPanel(CharacterFrame);
 				CharacterFrame_ShowSubFrame(tab);
+				ShowUIPanel(CharacterFrame);
 			end
 		end
 	end
@@ -70,13 +72,13 @@ function CharacterFrame_OnLoad (self)
 end
 
 function CharacterFrame_UpdatePortrait()
-	local masteryIndex = GetPrimaryTalentTree();
+	local masteryIndex = GetSpecialization();
 	if (masteryIndex == nil) then
 		local _, class = UnitClass("player");
 		CharacterFramePortrait:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles");
 		CharacterFramePortrait:SetTexCoord(unpack(CLASS_ICON_TCOORDS[class]));
 	else
-		local _, _, _, icon = GetTalentTabInfo(masteryIndex);
+		local _, _, _, icon = GetSpecializationInfo(masteryIndex);
 		CharacterFramePortrait:SetTexCoord(0, 1, 0, 1);
 		SetPortraitToTexture(CharacterFramePortrait, icon);	
 	end
@@ -111,12 +113,14 @@ function CharacterFrame_OnShow (self)
 	PlayerFrameHealthBar.showNumeric = true;
 	PlayerFrameManaBar.showNumeric = true;
 	PlayerFrameAlternateManaBar.showNumeric = true;
+	MonkStaggerBar.showNumeric = true;
 	MainMenuExpBar.showNumeric = true;
 	PetFrameHealthBar.showNumeric = true;
 	PetFrameManaBar.showNumeric = true;
 	ShowTextStatusBarText(PlayerFrameHealthBar);
 	ShowTextStatusBarText(PlayerFrameManaBar);
 	ShowTextStatusBarText(PlayerFrameAlternateManaBar);
+	ShowTextStatusBarText(MonkStaggerBar);
 	ShowTextStatusBarText(MainMenuExpBar);
 	ShowTextStatusBarText(PetFrameHealthBar);
 	ShowTextStatusBarText(PetFrameManaBar);
@@ -131,12 +135,14 @@ function CharacterFrame_OnHide (self)
 	PlayerFrameHealthBar.showNumeric = nil;
 	PlayerFrameManaBar.showNumeric = nil;
 	PlayerFrameAlternateManaBar.showNumeric = nil;
+	MonkStaggerBar.showNumeric = nil;
 	MainMenuExpBar.showNumeric =nil;
 	PetFrameHealthBar.showNumeric = nil;
 	PetFrameManaBar.showNumeric = nil;
 	HideTextStatusBarText(PlayerFrameHealthBar);
 	HideTextStatusBarText(PlayerFrameManaBar);
 	HideTextStatusBarText(PlayerFrameAlternateManaBar);
+	HideTextStatusBarText(MonkStaggerBar);
 	HideTextStatusBarText(MainMenuExpBar);
 	HideTextStatusBarText(PetFrameHealthBar);
 	HideTextStatusBarText(PetFrameManaBar);

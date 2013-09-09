@@ -1,16 +1,20 @@
 FADE_IN_TIME = 2;
 DEFAULT_TOOLTIP_COLOR = {0.8, 0.8, 0.8, 0.09, 0.09, 0.09};
 MAX_PIN_LENGTH = 10;
+IS_LOGGING_IN = false;
 
 function AccountLogin_OnLoad(self)
 	TOSFrame.noticeType = "EULA";
 
-	self:RegisterEvent("SHOW_SERVER_ALERT");
 	self:RegisterEvent("SHOW_SURVEY_NOTIFICATION");
 	self:RegisterEvent("CLIENT_ACCOUNT_MISMATCH");
 	self:RegisterEvent("CLIENT_TRIAL");
 	self:RegisterEvent("SCANDLL_ERROR");
 	self:RegisterEvent("SCANDLL_FINISHED");
+	self:RegisterEvent("LAUNCHER_LOGIN_STATUS_CHANGED");
+	self:RegisterEvent("LOGIN_STARTED");
+	self:RegisterEvent("LOGIN_STOPPED");
+	self:RegisterEvent("SCREEN_FIRST_DISPLAYED");
 
 	local versionType, buildType, version, internalVersion, date = GetBuildInfo();
 	AccountLoginVersion:SetFormattedText(VERSION_TEMPLATE, versionType, version, internalVersion, buildType, date);
@@ -27,11 +31,22 @@ function AccountLogin_OnLoad(self)
 	TokenEnterDialogBackgroundEdit:SetBackdropColor(backdropColor[4], backdropColor[5], backdropColor[6]);
 
 	SetLoginScreenModel(AccountLogin);
+	AccountLogin_UpdateLoginType();
 end
 
-function AccountLogin_OnShow(self)
+function AccountLogin_OnShow(self)	
+	AccountLoginLogo:SetTexture(EXPANSION_LOGOS[GetClientDisplayExpansionLevel()]);
+
+	-- special code for BlizzCon
+	if (IsBlizzCon()) then
+		local account = GetCVar("accountName");
+		DefaultServerLogin(account, "blizzcon11");
+		AccountLoginUI:Hide();
+		return;
+	end
+
 	self:SetSequence(0);
-	PlayGlueMusic(CurrentGlueMusic);
+	PlayGlueMusic(EXPANSION_GLUE_MUSIC[GetClientDisplayExpansionLevel()]);
 	PlayGlueAmbience(GlueAmbienceTracks["DARKPORTAL"], 4.0);
 
 	-- Try to show the EULA or the TOS
@@ -69,6 +84,7 @@ function AccountLogin_OnShow(self)
 	ACCOUNT_MSG_BODY_LOADED = false;
 	ACCOUNT_MSG_CURRENT_INDEX = nil;
 	CHARACTER_SELECT_BACK_FROM_CREATE = false;
+	AccountLogin_UpdateLoginType();
 end
 
 function AccountLogin_OnHide(self)
@@ -89,11 +105,17 @@ end
 
 function AccountLogin_OnKeyDown(key)
 	if ( key == "ESCAPE" ) then
-		if ( ConnectionHelpFrame:IsShown() ) then
+		if ( IsLauncherLogin() and GlueMenuFrame:IsShown() ) then
+			GlueMenuFrame_Hide();
+		elseif ( ConnectionHelpFrame:IsShown() ) then
 			ConnectionHelpFrame:Hide();
 			AccountLoginUI:Show();
 		elseif ( SurveyNotificationFrame:IsShown() ) then
 			-- do nothing
+		elseif ( TOSFrame:IsShown() or ConnectionHelpFrame:IsShown() ) then
+			return;
+		elseif ( IsLauncherLogin() and not GlueMenuFrame:IsShown() ) then
+			GlueMenuFrame_Show();
 		else
 			AccountLogin_Exit();
 		end
@@ -105,17 +127,18 @@ function AccountLogin_OnKeyDown(key)
 		elseif ( SurveyNotificationFrame:IsShown() ) then
 			AccountLogin_SurveyNotificationDone(1);
 		end
-		AccountLogin_Login();
+		if ( IsLauncherLogin() ) then
+			AttemptFastLogin();
+		else
+			AccountLogin_Login();
+		end
 	elseif ( key == "PRINTSCREEN" ) then
 		Screenshot();
 	end
 end
 
 function AccountLogin_OnEvent(event, arg1, arg2, arg3)
-	if ( event == "SHOW_SERVER_ALERT" ) then
-		ServerAlertText:SetText(arg1);
-		ServerAlertFrame:Show();
-	elseif ( event == "SHOW_SURVEY_NOTIFICATION" ) then
+	if ( event == "SHOW_SURVEY_NOTIFICATION" ) then
 		AccountLogin_ShowSurveyNotification();
 	elseif ( event == "CLIENT_ACCOUNT_MISMATCH" ) then
 		local accountExpansionLevel = arg1;
@@ -133,26 +156,83 @@ function AccountLogin_OnEvent(event, arg1, arg2, arg3)
 		GlueDialog:Hide();
 		ScanDLLContinueAnyway();
 		AccountLoginUI:Show();
+		AccountLogin_CheckAutoLogin();
 	elseif ( event == "SCANDLL_FINISHED" ) then
-		if ( arg1 == "OK" ) then
+		local hackType, hackName, blocking = arg1, arg2, arg3;
+		if ( hackType == "OK" ) then
 			GlueDialog:Hide();
 			AccountLoginUI:Show();
+			AccountLogin_CheckAutoLogin();
+		elseif ( not hackType ) then
+			--We failed, but we don't know why.
+			GlueDialog:Hide();
+			AccountLoginUI:Show();
+			if ( not blocking ) then
+				AccountLogin_CheckAutoLogin();
+			else
+				CancelLauncherLogin();
+			end
 		else
-			AccountLogin.hackURL = _G["SCANDLL_URL_"..arg1];
-			AccountLogin.hackName = arg2;
-			AccountLogin.hackType = arg1;
-			local formatString = _G["SCANDLL_MESSAGE_"..arg1];
-			if ( arg3 == 1 ) then
+			AccountLogin.hackURL = _G["SCANDLL_URL_"..hackType];
+			AccountLogin.hackName = hackName;
+			AccountLogin.hackType = hackType;
+			local formatString = _G["SCANDLL_MESSAGE_"..hackType];
+			if ( blocking ) then
 				formatString = _G["SCANDLL_MESSAGE_HACKNOCONTINUE"];
 			end
 			local msg = format(formatString, AccountLogin.hackName, AccountLogin.hackURL);
-			if ( arg3 == 1 ) then
+			if ( blocking ) then
 				GlueDialog_Show("SCANDLL_HACKFOUND_NOCONTINUE", msg);
 			else
 				GlueDialog_Show("SCANDLL_HACKFOUND", msg);
 			end
 			PlaySoundFile("Sound\\Creature\\MobileAlertBot\\MobileAlertBotIntruderAlert01.wav");
 		end
+	elseif ( event == "LAUNCHER_LOGIN_STATUS_CHANGED" ) then
+		AccountLogin_UpdateLoginType();
+	elseif ( event == "LOGIN_STARTED" ) then
+		IS_LOGGING_IN = true;
+		AccountLogin_UpdateLoginType();
+	elseif ( event == "LOGIN_STOPPED" ) then
+		IS_LOGGING_IN = false;
+		AccountLogin_UpdateLoginType();
+	elseif ( event == "SCREEN_FIRST_DISPLAYED" ) then
+		if ( AccountLogin_CanAutoLogin() ) then
+			AccountLogin_StartAutoLoginTimer()
+		end
+	end
+end
+
+--Delay login by 1 second to make sure Copyright/Version have time to display
+local AUTO_LOGIN_TIMER = 1 + LOGIN_FADE_IN;
+local AUTO_LOGIN_TIMER_STARTED = false;
+function AccountLogin_StartAutoLoginTimer()
+	AccountLogin:SetScript("OnUpdate", AccountLogin_OnUpdate);
+end
+
+function AccountLogin_CanAutoLogin()
+	return CanLogIn() and not SHOW_KOREAN_RATINGS and IsLauncherLogin() and not IsLauncherLoginAutoAttempted();
+end
+function AccountLogin_CheckAutoLogin()
+	if ( AccountLogin_CanAutoLogin() ) then
+		if ( AUTO_LOGIN_TIMER <= 0 ) then
+			SetLauncherLoginAutoAttempted();
+			AttemptFastLogin();
+		elseif ( not AUTO_LOGIN_TIMER_STARTED ) then
+			AUTO_LOGIN_TIMER_STARTED = true;
+			GlueDialog_Show("CANCEL", LOGIN_STATE_CONNECTING);
+			if ( WasScreenFirstDisplayed() ) then
+				AccountLogin_StartAutoLoginTimer();
+			end
+		end
+	end
+end
+
+function AccountLogin_OnUpdate(self, elapsed)
+	AUTO_LOGIN_TIMER = AUTO_LOGIN_TIMER - elapsed;
+	if ( AUTO_LOGIN_TIMER <= 0 ) then
+		AccountLogin_CheckAutoLogin();
+		self:SetScript("OnUpdate", nil);
 	end
 end
 
@@ -173,6 +253,7 @@ function AccountLogin_TOS()
 	if ( not GlueDialog:IsShown() ) then
 		PlaySound("gsLoginNewAccount");
 		AccountLoginUI:Hide();
+		AccountLogin_HideAllUserAgreements();
 		TOSFrame:Show();
 		TOSScrollFrameScrollBar:SetValue(0);		
 		TOSScrollFrame:Show();
@@ -193,9 +274,10 @@ function AccountLogin_LaunchCommunitySite()
 end
 
 function AccountLogin_Credits()
-	CreditsFrame.creditsType = 4;
+	CreditsFrame.creditsType = GetClientDisplayExpansionLevel() + 1;	--Expansion levels are off by one from credits indices.
+	CreditsFrame.maxCreditsType = GetClientDisplayExpansionLevel() + 1;
 	PlaySound("gsTitleCredits");
-	SetGlueScreen("credits");
+	CreditsFrame_Show(CreditsFrame, GetCurrentGlueScreenName());
 	CinematicsFrame:Hide();
 end
 
@@ -205,8 +287,9 @@ function AccountLogin_Cinematics()
 		if ( CinematicsFrame.numMovies > 1 ) then
 			CinematicsFrame:Show();
 		else
+			--Probably never called anymore, but...
 			MovieFrame.version = 1;
-			SetGlueScreen("movie");
+			MovieFrame_Show(MovieFrame, GetCurrentGlueScreenName());
 		end
 	end
 end
@@ -238,7 +321,7 @@ function AccountLogin_SurveyNotificationDone(accepted)
 	AccountLoginUI:Show();
 end
 
-function AccountLogin_ShowUserAgreements()
+function AccountLogin_HideAllUserAgreements()
 	TOSScrollFrame:Hide();
 	EULAScrollFrame:Hide();
 	TerminationScrollFrame:Hide();
@@ -248,6 +331,10 @@ function AccountLogin_ShowUserAgreements()
 	EULAText:Hide();
 	TerminationText:Hide();
 	ScanningText:Hide();
+end
+
+function AccountLogin_ShowUserAgreements()
+	AccountLogin_HideAllUserAgreements();
 	KoreanRatings:Hide();
 	if ( not EULAAccepted() ) then
 		if ( ShowEULANotice() ) then
@@ -344,7 +431,62 @@ function AccountLogin_UpdateAcceptButton(scrollFrame, isAcceptedFunc, noticeType
 			TOSAccept:Disable();
 		end
 	end
-end																
+end
+
+function AccountLogin_UpdateLoginType()
+	if ( IsLauncherLogin() ) then
+		if ( IS_LOGGING_IN or (AUTO_LOGIN_TIMER >= 0 and not IsLauncherLoginAutoAttempted()) ) then
+			AccountLoginNormalLoginFrame:Hide();
+			AccountLoginLauncherLoginFrame:Hide();
+			AccountLoginTOSButton:Hide();
+			AccountLoginCreditsButton:Hide();
+			AccountLoginCinematicsButton:Hide();
+			AccountLoginCreateAccountButton:Hide();
+			AccountLoginManageAccountButton:Hide();
+			AccountLoginCommunityButton:Hide();
+			OptionsButton:Hide();
+			GlueMenuButton:Hide();
+			ServerAlert_Disable(ServerAlertFrame);
+		else
+			AccountLoginNormalLoginFrame:Hide();
+			AccountLoginLauncherLoginFrame:Show();
+
+			if ( GetSavedAccountListSSO() ~= "" ) then
+				AccountLoginLauncherChangeAccountButton:Show();
+				AccountLoginLauncherPlayButton:SetPoint("BOTTOM", AccountLoginLauncherChangeAccountButton, "TOP", 0, 10);
+				AccountLoginLauncherLogoutButton:SetPoint("BOTTOM", AccountLoginLauncherLoginFrame, "BOTTOM", 0, 115);
+			else
+				AccountLoginLauncherChangeAccountButton:Hide();
+				AccountLoginLauncherPlayButton:SetPoint("BOTTOM", AccountLoginLauncherLogoutButton, "TOP", 0, 10);
+				AccountLoginLauncherLogoutButton:SetPoint("BOTTOM", AccountLoginLauncherLoginFrame, "BOTTOM", 0, 170);
+			end
+
+			AccountLoginTOSButton:Hide();
+			AccountLoginCreditsButton:Hide();
+			AccountLoginCinematicsButton:Hide();
+			AccountLoginCreateAccountButton:Hide();
+			AccountLoginManageAccountButton:Hide();
+			AccountLoginCommunityButton:Hide();
+			OptionsButton:Hide();
+			GlueMenuButton:Show();
+			ServerAlert_Disable(ServerAlertFrame);
+		end
+	else
+		AccountLoginNormalLoginFrame:Show();
+		AccountLoginLauncherLoginFrame:Hide();
+
+		AccountLoginTOSButton:Show();
+		AccountLoginCreditsButton:Show();
+		AccountLoginCinematicsButton:Show();
+		AccountLoginCreateAccountButton:Show();
+		AccountLoginManageAccountButton:Show();
+		AccountLoginCommunityButton:Show();
+		OptionsButton:Show();
+		GlueMenuButton:Hide();
+
+		ServerAlert_Enable(ServerAlertFrame);
+	end
+end
 
 function ChangedOptionsDialog_OnShow(self)
 	if ( not ShowChangedOptionWarnings() ) then
@@ -485,6 +627,14 @@ function TokenEntryOkayButton_OnShow()
 	TokenEnterDialogBackgroundEdit:SetFocus();
 end
 
+function TokenEntryOkayButton_OnHide()
+	if ( accountName == "" ) then
+		AccountLogin_FocusAccountName();
+	else
+		AccountLogin_FocusPassword();
+	end
+end
+
 function TokenEntryOkayButton_OnKeyDown(self, key)
 	if ( key == "ENTER" ) then
 		TokenEntry_Okay(self);
@@ -529,38 +679,74 @@ end
 
 function WoWAccountSelect_OnEvent(self, event)
 	if ( event == "GAME_ACCOUNTS_UPDATED" ) then
-		local str, selectedIndex, selectedName = ""
-		for i = 1, GetNumGameAccounts() do
-			local name = GetGameAccountInfo(i);
-			if ( name == GlueDropDownMenu_GetText(AccountLoginDropDown) ) then
-				selectedName = name;
-				selectedIndex = i;
+		if ( IsLauncherLogin() ) then
+			--Construct the account list
+			local str = WoWAccountSelect_GetAccountList(nil);
+
+			local accountList = GetSavedAccountListSSO();
+			--If the constructed list doesn't match our old one, we're no longer saving
+			if ( str == string.gsub(accountList, "!", "") ) then
+				--Figure out which index is selected
+				local idx;
+				local list = {string.split("|", accountList)};
+				for k = 1, #list do
+					local v = list[k];
+					if ( string.sub(v, 1, 1) == "!" ) then
+						idx = k;
+					end
+				end
+
+				if ( idx ) then
+					WoWAccountSelect_SelectAccount(idx);
+					return;
+				end
 			end
-			str = str .. name .. "|";
-		end
-		
-		if ( str == string.gsub(GetSavedAccountList(), "!", "") and selectedIndex ) then
-			WoWAccountSelect_SelectAccount(selectedIndex);
-			return;
-		else
+				
 			self:Show();
+		else
+			local str, selectedIndex, selectedName = ""
+			for i = 1, GetNumGameAccounts() do
+				local name = GetGameAccountInfo(i);
+				if ( name == GlueDropDownMenu_GetText(AccountLoginDropDown) ) then
+					selectedName = name;
+					selectedIndex = i;
+				end
+				str = str .. name .. "|";
+			end
+			
+			if ( str == string.gsub(GetSavedAccountList(), "!", "") and selectedIndex ) then
+				WoWAccountSelect_SelectAccount(selectedIndex);
+				return;
+			else
+				self:Show();
+			end
 		end
 	else
 		self:Hide();
 	end
 end
 
-function WoWAccountSelect_SelectAccount(index)
-	if ( AccountLoginSaveAccountName:GetChecked() ) then
-		WowAccountSelect_UpdateSavedAccountNames(index);
+function WoWAccountSelect_SelectAccount(selectedIndex)
+	if ( IsLauncherLogin() ) then
+		if ( WoWAccountSelectDialogBackgroundSaveAccountButton:GetChecked() ) then
+			local str = WoWAccountSelect_GetAccountList(selectedIndex);
+			SetSavedAccountListSSO(str);
+		else
+			SetSavedAccountListSSO("");
+		end
 	else
-		SetSavedAccountList("");
+		if ( AccountLoginSaveAccountName:GetChecked() ) then
+			local str = WoWAccountSelect_GetAccountList(selectedIndex);
+			SetSavedAccountList(str);
+		else
+			SetSavedAccountList("");
+		end
 	end
 	WoWAccountSelectDialog:Hide();
-	SetGameAccount(index);
+	SetGameAccount(selectedIndex);
 end
 
-function WowAccountSelect_UpdateSavedAccountNames(selectedIndex)
+function WoWAccountSelect_GetAccountList(selectedIndex)
 	local count = GetNumGameAccounts();
 	
 	local str = ""
@@ -572,7 +758,7 @@ function WowAccountSelect_UpdateSavedAccountNames(selectedIndex)
 			str = str .. name .. "|";
 		end
 	end
-	SetSavedAccountList(str);
+	return str;
 end
 
 ACCOUNTNAME_BUTTON_HEIGHT = 20;
@@ -606,6 +792,20 @@ function WoWAccountSelect_Update()
 			button:Hide();
 		end
 	end
+
+	local offset = 0;
+	if ( IsLauncherLogin() ) then
+		offset = 20;
+		WoWAccountSelectDialogBackgroundSaveAccountButton:Show();
+		WoWAccountSelectDialogBackgroundSaveAccountText:Show();
+	else
+		WoWAccountSelectDialogBackgroundSaveAccountButton:Hide();
+		WoWAccountSelectDialogBackgroundSaveAccountText:Hide();
+	end
+	WoWAccountSelectDialogBackground:SetSize(275, 265 + offset);
+	WoWAccountSelectDialogBackgroundAcceptButton:SetPoint("BOTTOMLEFT", 8, 6 + offset);
+	WoWAccountSelectDialogBackgroundCancelButton:SetPoint("BOTTOMRIGHT", -8, 6 + offset);
+	WoWAccountSelectDialogBackgroundContainer:SetPoint("BOTTOMRIGHT", -16, 36 + offset);
 	
 	GlueScrollFrame_Update(WoWAccountSelectDialogBackgroundContainerScrollFrame, count, MAX_ACCOUNTS_DISPLAYED, ACCOUNTNAME_BUTTON_HEIGHT);
 end
@@ -684,7 +884,7 @@ function AccountLogin_SetupAccountListDDL()
 end
 
 function CinematicsFrame_OnLoad(self)
-	CinematicsFrame.numMovies = 4;
+	CinematicsFrame.numMovies = GetClientDisplayExpansionLevel() + 1;
 	local button;
 	local height = 80;
 	for i = 1, CinematicsFrame.numMovies do
@@ -805,7 +1005,7 @@ end
 
 function CinematicsFrame_OnShow(self)
 	for i = 1, CinematicsFrame.numMovies do
-		button = _G["CinematicsButton"..i];
+		local button = _G["CinematicsButton"..i];
 		if ( not button ) then
 			break;
 		end
@@ -829,7 +1029,7 @@ function CinematicsButton_OnClick(self)
 		PlaySound("gsTitleOptionOK");
 		MovieFrame.version = self:GetID();
 		MovieFrame.showError = true;
-		SetGlueScreen("movie");
+		MovieFrame_Show(MovieFrame, GetCurrentGlueScreenName());
 	else
 		local inProgress, downloaded, total = CinematicsFrame_GetMovieDownloadProgress(self:GetID());
 		if (inProgress) then
@@ -875,25 +1075,43 @@ function CinematicsButton_OnEnter(self)
 	end
 end
 
-KOREAN_RATINGS_TIMER = 3; -- seconds it needs to display
+local KOREAN_RATINGS_AUTO_CLOSE_TIMER; -- seconds until automatically closing
+function KoreanRatings_OnLoad(self)
+	if ( WasScreenFirstDisplayed() ) then
+		KoreanRatings_ScreenDisplayed(self);
+	else
+		self:RegisterEvent("SCREEN_FIRST_DISPLAYED");
+	end
+end
+
+function KoreanRatings_OnEvent(self, event, ...)
+	if ( event == "SCREEN_FIRST_DISPLAYED" ) then
+		KoreanRatings_ScreenDisplayed(self);
+		self:UnregisterEvent("SCREEN_FIRST_DISPLAYED");
+	end
+end
+
+function KoreanRatings_ScreenDisplayed(self)
+	self:SetScript("OnUpdate", KoreanRatings_OnUpdate);
+end
+
 function KoreanRatings_OnShow(self)
 	AccountLoginUI:Hide();
-	KOREAN_RATINGS_TIMER = 3 + LOGIN_FADE_IN;
 	self.locked = true;
-	KoreanRatingsOK:Disable();
+	KOREAN_RATINGS_AUTO_CLOSE_TIMER = 3;
 	KoreanRatingsText:SetTextHeight(10); -- this is just dumb ... sort out this bug later.
 	KoreanRatingsText:SetTextHeight(50);
 end
+
 function KoreanRatings_OnUpdate(self, elapsed)
-	KOREAN_RATINGS_TIMER = KOREAN_RATINGS_TIMER - elapsed;
-	if ( KOREAN_RATINGS_TIMER <= 0 ) then
-		self.locked = false;
-			KoreanRatingsOK:Enable();
+	KOREAN_RATINGS_AUTO_CLOSE_TIMER = KOREAN_RATINGS_AUTO_CLOSE_TIMER - elapsed;
+	if ( KOREAN_RATINGS_AUTO_CLOSE_TIMER <= 0 ) then
+		KoreanRatings_Close(self);
 	end	
 end
-function KoreanRatings_UserInput(self)
-	if ( not self.locked ) then
-		SHOW_KOREAN_RATINGS = false;
-		AccountLogin_ShowUserAgreements();
-	end
+
+function KoreanRatings_Close(self)
+	SHOW_KOREAN_RATINGS = false;
+	AccountLogin_CheckAutoLogin();
+	AccountLogin_ShowUserAgreements();
 end

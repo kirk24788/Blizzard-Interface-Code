@@ -48,7 +48,7 @@ function ContainerFrame_OnEvent(self, event, ...)
 			ContainerFrame_Update(self);
 		end
 	elseif ( event == "DISPLAY_SIZE_CHANGED" ) then
-		updateContainerFrameAnchors();
+		UpdateContainerFrameAnchors();
 	elseif ( event == "INVENTORY_SEARCH_UPDATE" ) then
 		ContainerFrame_UpdateSearchResults(self);
 	end
@@ -137,7 +137,7 @@ function ContainerFrame_OnHide(self)
 		end
 		index = index + 1;
 	end
-	updateContainerFrameAnchors();
+	UpdateContainerFrameAnchors();
 
 	if ( self:GetID() == KEYRING_CONTAINER ) then
 		UpdateMicroButtons();
@@ -207,6 +207,7 @@ function CloseBag(id)
 	for i=1, NUM_CONTAINER_FRAMES, 1 do
 		local containerFrame = _G["ContainerFrame"..i];
 		if ( containerFrame:IsShown() and (containerFrame:GetID() == id) ) then
+			UpdateNewItemList(containerFrame);
 			containerFrame:Hide();
 			return;
 		end
@@ -252,9 +253,21 @@ function CloseBackpack()
 	for i=1, NUM_CONTAINER_FRAMES, 1 do
 		local containerFrame = _G["ContainerFrame"..i];
 		if ( containerFrame:IsShown() and (containerFrame:GetID() == 0) and (ContainerFrame1.backpackWasOpen == nil) ) then
+			UpdateNewItemList(containerFrame);
 			containerFrame:Hide();
 			return;
 		end
+	end
+end
+
+function UpdateNewItemList(containerFrame)
+	local id = containerFrame:GetID()
+	local name = containerFrame:GetName()
+	
+	for i=1, containerFrame.size, 1 do
+		itemButton = _G[name.."Item"..i];
+		
+		C_NewItems.RemoveNewItem(id, itemButton:GetID());
 	end
 end
 
@@ -278,6 +291,7 @@ function ContainerFrame_Update(frame)
 	local itemButton;
 	local texture, itemCount, locked, quality, readable, _, isFiltered;
 	local isQuestItem, questId, isActive, questTexture;
+	local isNewItem, isBattlePayItem, newItemTexture;
 	local tooltipOwner = GameTooltip:GetOwner();
 	
 	--Update Searchbox
@@ -313,6 +327,15 @@ function ContainerFrame_Update(frame)
 			questTexture:Hide();
 		end
 		
+		isNewItem = C_NewItems.IsNewItem(id, itemButton:GetID());
+		isBattlePayItem = IsBattlePayItem(id, itemButton:GetID());
+		newItemTexture = _G[name.."Item"..i.."NewItemTexture"];
+		if ( isNewItem and isBattlePayItem ) then
+			newItemTexture:Show();
+		else
+			newItemTexture:Hide();
+		end
+				
 		if ( texture ) then
 			ContainerFrame_UpdateCooldown(id, itemButton);
 			itemButton.hasItem = 1;
@@ -578,11 +601,11 @@ function ContainerFrame_GenerateFrame(frame, size, id)
 
 	-- Add the bag to the baglist
 	frame:Show();
-	updateContainerFrameAnchors();
+	UpdateContainerFrameAnchors();
 	frame:Raise();
 end
 
-function updateContainerFrameAnchors()
+function UpdateContainerFrameAnchors()
 	local frame, xOffset, yOffset, screenHeight, freeScreenHeight, leftMostPoint, column;
 	local screenWidth = GetScreenWidth();
 	local containerScale = 1;
@@ -676,6 +699,10 @@ function ContainerFrame_GetExtendedPriceString(itemButton, isEquipped, quantity)
 	itemCount =  (itemCount or 0) * quantity;
 	local itemsString;
 	
+	if ( money > 0 ) then
+		itemsString = "|W"..GetMoneyString(money).."|w";
+	end
+	
 	local maxQuality = 0;
 	for i=1, itemCount, 1 do
 		local itemTexture, itemQuantity, itemLink = GetContainerItemPurchaseItem(bag, slot, i, isEquipped);
@@ -704,7 +731,7 @@ function ContainerFrame_GetExtendedPriceString(itemButton, isEquipped, quantity)
 	if(itemsString == nil) then
 		itemsString = "";
 	end
-	MerchantFrame.price = money;
+	MerchantFrame.price = 0;
 	MerchantFrame.refundBag = bag;
 	MerchantFrame.refundSlot = slot;
 	MerchantFrame.honorPoints = honorPoints;
@@ -723,7 +750,7 @@ function ContainerFrame_GetExtendedPriceString(itemButton, isEquipped, quantity)
 	if (hasEnchants) then
 		textLine2 = "\n\n"..CONFIRM_REFUND_ITEM_ENHANCEMENTS_LOST;
 	end
-	StaticPopupDialogs["CONFIRM_REFUND_TOKEN_ITEM"].hasMoneyFrame = (money ~= 0) and 1 or nil;
+	StaticPopupDialogs["CONFIRM_REFUND_TOKEN_ITEM"].hasMoneyFrame = nil;
 	StaticPopup_Show("CONFIRM_REFUND_TOKEN_ITEM", itemsString, textLine2, {["texture"] = refundItemTexture, ["name"] = itemName, ["color"] = {r, g, b, 1}, ["link"] = refundItemLink, ["index"] = index, ["count"] = count * quantity});
 	return true;
 end
@@ -777,13 +804,6 @@ function ContainerFrameItemButton_OnModifiedClick(self, button)
 	if ( HandleModifiedItemClick(GetContainerItemLink(self:GetParent():GetID(), self:GetID())) ) then
 		return;
 	end
-	if ( TradeSkillFrame and TradeSkillFrame:IsShown() and IsModifiedClick("TRADESEARCHADD") )  then
-		local name = GetItemInfo( GetContainerItemID( self:GetParent():GetID(), self:GetID()) );
-		TradeSkillFrameSearchBox:SetFontObject("ChatFontSmall");
-		TradeSkillFrameSearchBoxSearchIcon:SetVertexColor(1.0, 1.0, 1.0);
-		TradeSkillFrameSearchBox:SetText(name);
-		return;
-	end
 	if ( IsModifiedClick("SOCKETITEM") ) then
 		SocketContainerItem(self:GetParent():GetID(), self:GetID());
 	end
@@ -814,8 +834,24 @@ function ContainerFrameItemButton_OnEnter(self)
 		return;
 	end
 
+	C_NewItems.RemoveNewItem(self:GetParent():GetID(), self:GetID());
+
+	newItemTexture = _G[self:GetName().."NewItemTexture"];
+	if newItemTexture then
+		newItemTexture:Hide();
+	end
+	
 	local showSell = nil;
-	local hasCooldown, repairCost = GameTooltip:SetBagItem(self:GetParent():GetID(), self:GetID());
+	local hasCooldown, repairCost, speciesID, level, breedQuality, maxHealth, power, speed, name = GameTooltip:SetBagItem(self:GetParent():GetID(), self:GetID());
+	if(speciesID and speciesID > 0) then
+		BattlePetToolTip_Show(speciesID, level, breedQuality, maxHealth, power, speed, name);
+		return;
+	else
+		if (BattlePetTooltip) then
+			BattlePetTooltip:Hide();
+		end
+	end
+
 	if ( InRepairMode() and (repairCost and repairCost > 0) ) then
 		GameTooltip:AddLine(REPAIR_COST, "", 1, 1, 1);
 		SetTooltipMoney(GameTooltip, repairCost);

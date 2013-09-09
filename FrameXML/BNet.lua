@@ -17,8 +17,12 @@ BN_TOAST_BOTTOM_OFFSET = -12;
 BN_TOAST_RIGHT_OFFSET = -1;
 BN_TOAST_LEFT_OFFSET = 1;
 BN_TOAST_TOP_BUFFER = 20;	-- the minimum distance in pixels from the toast to the top edge of the screen
-BN_TOAST_MAX_LINE_WIDTH = 196;
-	
+
+BNET_CLIENT_WOW = "WoW";
+BNET_CLIENT_SC2 = "S2";
+BNET_CLIENT_D3 = "D3";
+BNET_CLIENT_WTCG = "WTCG";
+
 function BNet_OnLoad(self)
 	self:RegisterEvent("BN_CONNECTED");
 	self:RegisterEvent("BN_DISCONNECTED");
@@ -65,7 +69,9 @@ function BNToastFrame_OnEvent(self, event, arg1)
 	if ( event == "BN_FRIEND_ACCOUNT_ONLINE" ) then	
 		BNToastFrame_AddToast(BN_TOAST_TYPE_ONLINE, arg1);
 	elseif ( event == "BN_FRIEND_ACCOUNT_OFFLINE" ) then
-		BNToastFrame_AddToast(BN_TOAST_TYPE_OFFLINE, arg1);
+		if ( BNet_ShouldProcessOfflineEvents() ) then
+			BNToastFrame_AddToast(BN_TOAST_TYPE_OFFLINE, arg1);
+		end
 	elseif ( event == "BN_CUSTOM_MESSAGE_CHANGED" ) then
 		if ( arg1 ) then
 			BNToastFrame_AddToast(BN_TOAST_TYPE_BROADCAST, arg1);
@@ -81,6 +87,21 @@ function BNToastFrame_OnEvent(self, event, arg1)
 		if ( GetCVarBool("showToastWindow") ) then
 			BNet_EnableToasts();
 		end
+	end
+end
+
+function BNToastFrame_OnEnter()
+	AlertFrame_StopOutAnimation(BNToastFrame);
+	if ( BNToastFrame.toastType == BN_TOAST_TYPE_BROADCAST and BNToastFrameBottomLine:IsTruncated() ) then
+		BNToastFrame.TooltipFrame.Text:SetText(BNToastFrameBottomLine:GetText());
+		BNToastFrame.TooltipFrame:Show();
+	end
+end
+
+function BNToastFrame_OnLeave()
+	AlertFrame_ResumeOutAnimation(BNToastFrame);
+	if ( BNToastFrame.toastType == BN_TOAST_TYPE_BROADCAST ) then
+		BNToastFrame.TooltipFrame:Hide();
 	end
 end
 
@@ -144,21 +165,15 @@ function BNToastFrame_Show()
 		BNToastFrameDoubleLine:Show();
 		BNToastFrameDoubleLine:SetFormattedText(BN_TOAST_PENDING_INVITES, toastData);
 	elseif ( toastType == BN_TOAST_TYPE_ONLINE ) then
-		local presenceID, givenName, surname = BNGetFriendInfoByID(toastData);
+		local presenceID, presenceName = BNGetFriendInfoByID(toastData);
 		-- don't display a toast if we didn't get the data in time
-		if ( not givenName or not surname ) then
+		if ( not presenceName ) then
 			return;
 		end
 		
 		local _, toonName, client = BNGetToonInfo(presenceID);
 		if (toonName and toonName ~= "") then
-			if ( client == BNET_CLIENT_WOW ) then
-				toonName = "|TInterface\\ChatFrame\\UI-ChatIcon-WOW:14:14:0:-1|t"..toonName;
-			elseif ( client == BNET_CLIENT_SC2 ) then
-				toonName = "|TInterface\\ChatFrame\\UI-ChatIcon-SC2:14:14:0:-1|t"..toonName;
-			elseif ( client == BNET_CLIENT_D3 ) then
-				toonName = "|TInterface\\ChatFrame\\UI-ChatIcon-D3:14:14:0:-1|t"..toonName;
-			end
+			toonName = BNet_GetClientEmbeddedTexture(client, 14, 14, 0, -1)..toonName;
 			middleLine:SetFormattedText(toonName);
 			middleLine:SetTextColor(FRIENDS_BNET_NAME_COLOR.r, FRIENDS_BNET_NAME_COLOR.g, FRIENDS_BNET_NAME_COLOR.b);
 			middleLine:Show();
@@ -168,21 +183,21 @@ function BNToastFrame_Show()
 		
 		BNToastFrameIconTexture:SetTexCoord(0, 0.25, 0.5, 1);
 		topLine:Show();
-		topLine:SetFormattedText(BATTLENET_NAME_FORMAT, givenName, surname);
+		topLine:SetText(presenceName);
 		topLine:SetTextColor(FRIENDS_BNET_NAME_COLOR.r, FRIENDS_BNET_NAME_COLOR.g, FRIENDS_BNET_NAME_COLOR.b);
 		bottomLine:Show();
 		bottomLine:SetText(BN_TOAST_ONLINE);
 		bottomLine:SetTextColor(FRIENDS_GRAY_COLOR.r, FRIENDS_GRAY_COLOR.g, FRIENDS_GRAY_COLOR.b);
 		BNToastFrameDoubleLine:Hide();
 	elseif ( toastType == BN_TOAST_TYPE_OFFLINE ) then
-		local presenceID, givenName, surname = BNGetFriendInfoByID(toastData);
+		local presenceID, presenceName = BNGetFriendInfoByID(toastData);
 		-- don't display a toast if we didn't get the data in time
-		if ( not givenName or not surname ) then
+		if ( not presenceName ) then
 			return;
 		end
 		BNToastFrameIconTexture:SetTexCoord(0, 0.25, 0.5, 1);
 		topLine:Show();
-		topLine:SetFormattedText(BATTLENET_NAME_FORMAT, givenName, surname);
+		topLine:SetFormattedText(presenceName);
 		topLine:SetTextColor(FRIENDS_BNET_NAME_COLOR.r, FRIENDS_BNET_NAME_COLOR.g, FRIENDS_BNET_NAME_COLOR.b);
 		bottomLine:Show();
 		bottomLine:SetText(BN_TOAST_OFFLINE);
@@ -200,21 +215,16 @@ function BNToastFrame_Show()
 		BNToastFrameDoubleLine:Hide();
 		middleLine:Hide();
 	elseif ( toastType == BN_TOAST_TYPE_BROADCAST ) then
-		local presenceID, givenName, surname, toonName, toonID, client, isOnline, lastOnline, isAFK, isDND, messageText = BNGetFriendInfoByID(toastData);
+		local presenceID, presenceName, battleTag, isBattleTagPresence, toonName, toonID, client, isOnline, lastOnline, isAFK, isDND, messageText = BNGetFriendInfoByID(toastData);
 		if ( not messageText or messageText == "" ) then
 			return;
 		end	
 		BNToastFrameIconTexture:SetTexCoord(0, 0.25, 0, 0.5);
 		topLine:Show();
-		topLine:SetFormattedText(BATTLENET_NAME_FORMAT, givenName, surname);
+		topLine:SetText(presenceName);
 		topLine:SetTextColor(FRIENDS_BNET_NAME_COLOR.r, FRIENDS_BNET_NAME_COLOR.g, FRIENDS_BNET_NAME_COLOR.b);
 		bottomLine:Show();
-		bottomLine:SetWidth(0);
 		bottomLine:SetText(messageText);
-		if ( bottomLine:GetWidth() > BN_TOAST_MAX_LINE_WIDTH ) then
-			bottomLine:SetWidth(BN_TOAST_MAX_LINE_WIDTH);
-			BNToastFrame.tooltip = messageText;
-		end
 		bottomLine:SetTextColor(FRIENDS_GRAY_COLOR.r, FRIENDS_GRAY_COLOR.g, FRIENDS_GRAY_COLOR.b);
 		BNToastFrameDoubleLine:Hide();
 		middleLine:Hide();
@@ -247,8 +257,8 @@ function BNToastFrame_Show()
 end
 
 function BNToastFrame_Close()
-	BNToastFrame.tooltip = nil;
 	BNToastFrame:Hide();
+	BNToastFrame.TooltipFrame:Hide();
 end
 
 function BNToastFrame_OnUpdate()
@@ -309,10 +319,6 @@ function BNToastFrame_UpdateAnchor(forceAnchor)
 end
 
 function BNToastFrame_OnClick(self)	
-	-- hide the tooltip if necessary
-	if ( BNToastFrame.tooltip and GameTooltip:GetOwner() == BNToastFrame ) then
-		GameTooltip:Hide();
-	end
 	BNToastFrame_Close();
 	local toastType = BNToastFrame.toastType;
 	local toastData = BNToastFrame.toastData;
@@ -339,9 +345,9 @@ function BNToastFrame_OnClick(self)
 		_G[chatFrame:GetName().."Tab"]:Click();
 		--ChatFrame_OpenChat("/"..(toastData + MAX_WOW_CHAT_CHANNELS), chatFrame);
 	elseif ( toastType == BN_TOAST_TYPE_ONLINE or toastType == BN_TOAST_TYPE_BROADCAST ) then
-		local presenceID, givenName, surname = BNGetFriendInfoByID(toastData);
-		if ( givenName ) then	--This player may have been removed from our friends list, so we may not have a name.
-			ChatFrame_SendTell(string.format(BATTLENET_NAME_FORMAT, givenName, surname));
+		local presenceID, presenceName = BNGetFriendInfoByID(toastData);
+		if ( presenceName ) then	--This player may have been removed from our friends list, so we may not have a name.
+			ChatFrame_SendSmartTell(presenceName);
 		end
 	end
 end
@@ -350,7 +356,7 @@ function SynchronizeBNetStatus()
 	if ( BNFeaturesEnabledAndConnected() ) then
 		local wowAFK = (IsChatAFK());
 		local wowDND = (IsChatDND());
-		local _, _, _, bnetAFK, bnetDND = BNGetInfo();
+		local _, _, _, _, bnetAFK, bnetDND = BNGetInfo();
 		if ( wowAFK ~= bnetAFK ) then
 			BNSetAFK(wowAFK);
 		end
@@ -367,18 +373,17 @@ function BNet_InitiateReport(presenceID, reportType)
 	end
 	CloseDropDownMenus();
 	-- set up
-	local fullName, givenName, surname;
+	local fullName;
 	if ( not presenceID ) then
 		-- invite
-		presenceID, givenName, surname = BNGetFriendInviteInfo(UIDROPDOWNMENU_MENU_VALUE);
-		fullName = string.format(BATTLENET_NAME_FORMAT, givenName, surname);
+		presenceID, fullName = BNGetFriendInviteInfo(UIDROPDOWNMENU_MENU_VALUE);
 	else
-		local _, givenName, surname, toonName = BNGetFriendInfoByID(presenceID);
-		if ( givenName and surname ) then
+		local _, presenceName, battleTag, isBattleTagPresence, toonName = BNGetFriendInfoByID(presenceID);
+		if ( presenceName ) then
 			if ( toonName ) then
-				fullName = string.format(BATTLENET_NAME_FORMAT, givenName, surname).." ("..toonName..")";
+				fullName = presenceName.." ("..toonName..")";
 			else
-				fullName = string.format(BATTLENET_NAME_FORMAT, givenName, surname);
+				fullName = presenceName;
 			end
 		else
 			local _, toonName = BNGetToonInfo(presenceID);
@@ -462,5 +467,64 @@ function TimeAlert_OnUpdate(self, elapsed)
 	end
 end
 
+function BNet_ShouldProcessOfflineEvents()
+	-- can process if we're not logging out
+	if ( not IsLoggingOut() ) then
+		return true;
+	end
+	-- if the logout timer is up, we should only process if there is more than 1 second left
+	local frameName = StaticPopup_Visible("CAMP");
+	if ( frameName ) then
+		if ( _G[frameName].timeleft ) > 1 then
+			return true;
+		else
+			return false;
+		end
+	end
+	-- ugh, why are there 2 of these?
+	frameName = StaticPopup_Visible("QUIT");
+	if ( frameName ) then
+		if ( _G[frameName].timeleft ) > 1 then
+			return true;
+		else
+			return false;
+		end
+	end
+	-- no logout timers up, must be instant logout
+	return false;
+end
 
+function BNet_GetClientEmbeddedTexture(client, width, height, xOffset, yOffset)
+	if ( not height ) then
+		height = width;
+		xOffset = 0;
+		yOffset = 0;
+	end
+	local textureString;
+	if ( client == BNET_CLIENT_WOW ) then
+		textureString = "WOW";
+	elseif ( client == BNET_CLIENT_SC2 ) then
+		textureString = "SC2";
+	elseif ( client == BNET_CLIENT_D3 ) then
+		textureString = "D3";
+	elseif ( client == BNET_CLIENT_WTCG ) then
+		textureString = "WTCG";
+	else
+		textureString = "Battlenet";
+	end
+	return string.format("|TInterface\\ChatFrame\\UI-ChatIcon-%s:%d:%d:%d:%d|t", textureString, width, height, xOffset, yOffset);
+end
 
+function BNet_GetClientTexture(client)
+	if ( client == BNET_CLIENT_WOW ) then
+		return "Interface\\FriendsFrame\\Battlenet-WoWicon";
+	elseif ( client == BNET_CLIENT_SC2 ) then
+		return "Interface\\FriendsFrame\\Battlenet-Sc2icon";
+	elseif ( client == BNET_CLIENT_D3 ) then
+		return "Interface\\FriendsFrame\\Battlenet-D3icon";
+	elseif ( client == BNET_CLIENT_WTCG ) then
+		return "Interface\\FriendsFrame\\Battlenet-WTCGicon";
+	else
+		return "Interface\\FriendsFrame\\Battlenet-Battleneticon";
+	end
+end

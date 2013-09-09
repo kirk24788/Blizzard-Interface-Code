@@ -2,6 +2,31 @@
 ..\FrameXML\UI.xsd">
 	<Script file="WorldMapFrame.lua"/>
 	<Include file="WorldMapFrameTemplates.xml"/>
+	<Frame name="WorldMapPlayerTemplate" virtual="true">
+		<Size x="28" y="28"/>
+		<Anchors>
+			<Anchor point="CENTER"/>
+		</Anchors>
+		<Layers>
+			<Layer level="ARTWORK">
+				<Texture name="$parentIcon" file="Interface\WorldMap\WorldMapArrow" setAllPoints="true" parentKey="icon"/>
+			</Layer>
+		</Layers>
+		<Scripts>
+			<OnLoad>
+				self.unit = "player";
+			</OnLoad>
+			<OnEnter>
+				WorldMapUnit_OnEnter(self, motion);
+			</OnEnter>
+			<OnLeave>
+				WorldMapUnit_OnLeave(self, motion);
+			</OnLeave>
+			<OnMouseUp>
+				WorldMapUnit_OnMouseUp(self, button, "WorldMapRaid", "WorldMapParty");
+			</OnMouseUp>
+		</Scripts>
+	</Frame>
 	<Frame name="WorldMapFrame" setAllPoints="true" hidden="true" enableKeyboard="true" enableMouse="true" clampedToScreen="true">
 		<Layers>
 			<Layer level="BACKGROUND">
@@ -299,7 +324,7 @@
                             </Anchors>
                         </Texture>	
                     </Layer>
-                    <Layer level="ARTWORK">
+                    <Layer level="OVERLAY">
                         <Texture name="WorldMapHighlight" alphaMode="ADD" hidden="true">
                             <Size x="128" y="128"/>
                             <Anchors>
@@ -307,7 +332,7 @@
                             </Anchors>
                         </Texture>
                     </Layer>
-                    <Layer level="OVERLAY">
+                    <Layer level="ARTWORK">
                         <FontString name="WorldMapZoneInfo" inherits="SubZoneTextFont" justifyH="CENTER" hidden="true">
                             <Anchors>
                                 <Anchor point="BOTTOM" relativePoint="BOTTOM" x="0" y="20"/>
@@ -460,33 +485,44 @@
 					<OnUpdate function="ArchaeologyDigSiteFrame_OnUpdate"/>
 				</Scripts>
 			</ArchaeologyDigSiteFrame>
+			<Frame name="WorldMapShowDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
+				<Anchors>
+					<Anchor point="BOTTOMRIGHT" relativeTo="WorldMapPositioningGuide" relativePoint="BOTTOMRIGHT" x="10" y="-2" />
+				</Anchors>	
+				<Scripts>
+					<OnLoad function="WorldMapShowDropDown_OnLoad" />
+					<OnShow function="WorldMapShowDropDown_OnLoad" />
+				</Scripts>
+			</Frame>		
+			<ScenarioPOIFrame name="ScenarioPOIFrame">
+				<Size x="1002" y="668"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" relativeTo="WorldMapDetailFrame" x="0" y="0"/>
+				</Anchors>				
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture name="WorldMapBlobFrameTexture" setAllPoints="true" />
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnLoad>
+						self:SetFillTexture("Interface\\WorldMap\\UI-QuestBlob-Inside");
+						self:SetBorderTexture("Interface\\WorldMap\\UI-QuestBlob-Outside");
+						self:SetFillAlpha(128);
+						self:SetBorderAlpha(192);
+						self:SetBorderScalar(1.0);
+					</OnLoad>
+					<OnUpdate function="ScenarioPOIFrame_OnUpdate"/>
+				</Scripts>
+			</ScenarioPOIFrame>
 			<Button name="WorldMapButton">
 				<Size x="1002" y="668"/>
 				<Anchors>
 					<Anchor point="TOPLEFT" relativeTo="WorldMapDetailFrame" x="0" y="0"/>
 				</Anchors>
 				<Frames>
-					<Frame name="WorldMapPlayer" id="0">
-						<Size x="16" y="16"/>
-						<Anchors>
-							<Anchor point="CENTER"/>
-						</Anchors>
-						<Scripts>
-							<OnLoad>
-								self.unit = "player";
-								self:SetFrameLevel(self:GetFrameLevel()+1);
-							</OnLoad>
-							<OnEnter>
-								WorldMapUnit_OnEnter(self, motion);
-							</OnEnter>
-							<OnLeave>
-								WorldMapUnit_OnLeave(self, motion);
-							</OnLeave>
-							<OnMouseUp>
-								WorldMapUnit_OnMouseUp(self, button, "WorldMapRaid", "WorldMapParty");
-							</OnMouseUp>
-						</Scripts>
-					</Frame>
+					<Frame name="WorldMapPlayerLower" inherits="WorldMapPlayerTemplate" framestrata="MEDIUM" hidden="true"/>
+					<Frame name="WorldMapPlayerUpper" inherits="WorldMapPlayerTemplate" framestrata="FULLSCREEN" alpha="0.7" hidden="true"/>
 
 					<Frame name="WorldMapUnitDropDown" inherits="UIDropDownMenuTemplate" clampedToScreen="true" id="1" hidden="true"/>
 
@@ -536,6 +572,8 @@
 					<Frame name="WorldMapRaid40" inherits="WorldMapRaidUnitTemplate" id="40"/>
 					<Frame name="WorldMapFlag1" inherits="WorldMapFlagTemplate" id="1"/>
 					<Frame name="WorldMapFlag2" inherits="WorldMapFlagTemplate" id="2"/>
+					<Frame name="WorldMapFlag3" inherits="WorldMapFlagTemplate" id="3"/>
+					<Frame name="WorldMapFlag4" inherits="WorldMapFlagTemplate" id="4"/>
 					<Frame name="WorldMapCorpse" inherits="WorldMapCorpseTemplate"/>
 					<Frame name="WorldMapDeathRelease" inherits="WorldMapCorpseTemplate">
 						<Scripts>
@@ -552,18 +590,45 @@
 							</OnEnter>
 						</Scripts>
 					</Frame>
-					<Model name="WorldMapPing" file="Interface\MiniMap\Ping\MinimapPing.mdx" scale="0.4" hidden="true">
-						<Size x="50" y="50"/>
+					<Frame name="WorldMapPing" framestrata="FULLSCREEN" hidden="true">
+						<Size x="64" y="64"/>
 						<Anchors>
 							<Anchor point="CENTER" relativeTo="WorldMapFrame"/>
 						</Anchors>
-						<Scripts>
-							<OnLoad>
-								self.fadeOut = nil;
-								self:SetSequence(0);
-							</OnLoad>
-						</Scripts>
-					</Model>
+						<Layers>
+							<Layer level="OVERLAY">
+								<Texture parentKey="centerRing" file="Interface\minimap\UI-Minimap-Ping-Center">
+									<Size x="32" y="32"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="rotatingRing" file="Interface\minimap\UI-Minimap-Ping-Rotate">
+									<Size x="48" y="48"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+								<Texture parentKey="expandingRing" file="Interface\minimap\UI-Minimap-Ping-Expand">
+									<Size x="32" y="32"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Animations>
+							<AnimationGroup parentKey="Ping" looping="REPEAT">
+								<Rotation targetKey="$parent.$parent.rotatingRing" degrees="-180" duration="0.75" order="1"/>
+								<Scale targetKey="$parent.$parent.expandingRing" scaleX="1.75" scaleY="1.75" duration="0.75" order="1"/>
+								<Scripts>
+									<OnPlay function="WorldMapPing_OnPlay"/>
+									<OnLoop function="WorldMapPing_OnLoop"/>
+									<OnStop function="WorldMapPing_OnStop"/>
+								</Scripts>
+							</AnimationGroup>
+						</Animations>
+					</Frame>
 					<Frame name="WorldMapFrameAreaFrame">
 						<Size x="400" y="128"/>
 						<Anchors>
@@ -572,14 +637,19 @@
 						<Layers>
 							<Layer level="OVERLAY">
 								<FontString name="WorldMapFrameAreaLabel" inherits="WorldMapTextFont" text="BLAH!" justifyV="TOP">
-									<Size x="900" y="100"/>
+									<Size x="900" y="0"/>
 									<Anchors>
 										<Anchor point="TOP" x="0" y="-20"/>
 									</Anchors>
 								</FontString>
 								<FontString name="WorldMapFrameAreaDescription" inherits="SubZoneTextFont">
 									<Anchors>
-										<Anchor point="TOP" relativeTo="WorldMapFrameAreaLabel" relativePoint="BOTTOM" x="0" y="0"/>
+										<Anchor point="TOP" relativeTo="WorldMapFrameAreaLabel" relativePoint="BOTTOM" x="0" y="-10"/>
+									</Anchors>
+								</FontString>
+								<FontString name="WorldMapFrameAreaPetLevels" inherits="SubZoneTextFont">
+									<Anchors>
+										<Anchor point="TOP" relativeTo="WorldMapFrameAreaLabel" relativePoint="BOTTOM" x="0" y="-10"/>
 									</Anchors>
 								</FontString>
 							</Layer>
@@ -784,7 +854,7 @@
 					<OnLoad>
 						local text = _G[self:GetName().."Text"];
 						text:SetText(TRACK_QUEST);
-						self:SetPoint("BOTTOMLEFT", WorldMapPositioningGuide, "BOTTOMLEFT", 10, 4);
+						self:SetPoint("BOTTOMLEFT", WorldMapPositioningGuide, "BOTTOMLEFT", 16, 4);
 					</OnLoad>
 					<OnClick>
 						local isChecked = self:GetChecked();
@@ -804,87 +874,6 @@
 					</OnLeave>
 				</Scripts>
 			</CheckButton>			
-			<CheckButton name="WorldMapQuestShowObjectives" inherits="OptionsCheckButtonTemplate">
-				<Size x="24" y="24"/>
-				<Scripts>
-					<OnLoad>
-						local text = _G[self:GetName().."Text"];
-						text:SetText(SHOW_QUEST_OBJECTIVES_ON_MAP_TEXT);
-						self:SetPoint("BOTTOMRIGHT", WorldMapPositioningGuide, "BOTTOMRIGHT", -15 - text:GetWidth(), 4);
-					</OnLoad>
-					<OnClick>
-						if ( self:GetChecked() ) then
-							PlaySound("igMainMenuOptionCheckBoxOn");
-						else
-							PlaySound("igMainMenuOptionCheckBoxOff");
-						end
-						SetCVar("questPOI", self:GetChecked());
-						WorldMapQuestShowObjectives_Toggle();
-						if ( WORLDMAP_SETTINGS.size == WORLDMAP_WINDOWED_SIZE ) then
-							WatchFrame_GetCurrentMapQuests();
-							WatchFrame_Update();
-						end
-						WorldMapFrame_DisplayQuests();
-					</OnClick>
-					<OnEnter>
-						WorldMapTooltip:SetOwner(self, "ANCHOR_LEFT");
-						WorldMapTooltip:SetText(OPTION_TOOLTIP_SHOW_QUEST_OBJECTIVES_ON_MAP, nil, nil, nil, nil, 1);
-					</OnEnter>
-					<OnLeave>
-						WorldMapTooltip:Hide();
-					</OnLeave>
-				</Scripts>
-			</CheckButton>
-			<CheckButton name="WorldMapShowDigSites" inherits="OptionsCheckButtonTemplate" hidden="true">
-				<Size x="24" y="24"/>
-				<Scripts>
-					<OnLoad>
-						local _, _, arch = GetProfessions();
-						if arch then
-							self:Show();
-							local showDig = GetCVarBool("digSites");
-							self:SetChecked(showDig);
-							if showDig then
-								WorldMapArchaeologyDigSites:Show();
-							else
-								WorldMapArchaeologyDigSites:Hide();
-							end
-						else
-							self:Hide();
-						end
-						local text = _G[self:GetName().."Text"];
-						text:SetText(ARCHAEOLOGY_SHOW_DIG_SITES);
-						self:SetPoint("RIGHT", WorldMapQuestShowObjectives, "LEFT", -140, 0);
-					</OnLoad>
-					<OnClick>
-						if ( self:GetChecked() ) then
-							PlaySound("igMainMenuOptionCheckBoxOn");
-							WorldMapArchaeologyDigSites:Show();
-						else
-							PlaySound("igMainMenuOptionCheckBoxOff");
-							WorldMapArchaeologyDigSites:Hide();
-						end
-						SetCVar("digSites", self:GetChecked());
-						RefreshWorldMap();
-					</OnClick>
-					<OnEnter>
-						WorldMapTooltip:SetOwner(self, "ANCHOR_LEFT");
-						WorldMapTooltip:SetText(OPTION_TOOLTIP_SHOW_DIG_SITES, nil, nil, nil, nil, 1);
-					</OnEnter>
-					<OnLeave>
-						WorldMapTooltip:Hide();
-					</OnLeave>
-				</Scripts>
-			</CheckButton>
-			<Frame name="WorldMapShowDropDown" inherits="UIDropDownMenuTemplate" enableMouse="true">
-				<Anchors>
-					<Anchor point="BOTTOMRIGHT" relativeTo="WorldMapPositioningGuide" relativePoint="BOTTOMRIGHT" x="10" y="-2" />
-				</Anchors>
-				<Scripts>
-					<OnLoad function="WorldMapShowDropDown_OnLoad" />
-					<OnShow function="WorldMapShowDropDown_OnLoad" />
-				</Scripts>
-			</Frame>
 		</Frames>
 		<Scripts>
 			<OnLoad function="WorldMapFrame_OnLoad"/>

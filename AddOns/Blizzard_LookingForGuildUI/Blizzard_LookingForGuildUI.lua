@@ -310,6 +310,7 @@ function LookingForGuildGuild_OnClick(self, button)
 	if ( button == "LeftButton" ) then
 		local name, level, numMembers, achPoints, comment, cached, requestPending = GetRecruitingGuildInfo(self.index);
 		if ( not requestPending ) then
+			PlaySound("igMainMenuOptionCheckBoxOn");
 			SetRecruitingGuildSelection(self.index);
 			local commentHeight = self.fullComment:GetHeight();
 			if ( commentHeight > GUILD_COMMENT_HEIGHT ) then
@@ -363,7 +364,7 @@ end
 
 function GuildFinderRequestMembershipFrame_SendRequest()
 	StaticPopupSpecial_Hide(GuildFinderRequestMembershipFrame);
-	RequestGuildMembership(GuildFinderRequestMembershipFrameGuildName:GetText(), GuildFinderRequestMembershipEditBox:GetText());
+	RequestGuildMembership(GuildFinderRequestMembershipFrameGuildName:GetText(), GuildFinderRequestMembershipEditBox:GetText():gsub("\n",""));
 	SetRecruitingGuildSelection(nil);
 	LookingForGuild_Update();
 end

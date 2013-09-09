@@ -26,6 +26,7 @@ local ErrorCodes =
 	VRN_NEEDS_5_0,
 	VRN_MACOS_UNSUPPORTED,
 	VRN_WINDOWS_UNSUPPORTED,
+	VRN_WINDOWS_32BIT,
 	VRN_NEEDS_MACOS_10_5_5,
 	VRN_NEEDS_MACOS_10_5_7,
 	VRN_NEEDS_MACOS_10_5_8,
@@ -120,6 +121,16 @@ function Graphics_PrepareTooltip(self)
 					errorValue = (errorValue or "") .. ErrorCodes[err] .. "|n";
 				end
 			end
+			if(not invalid and self.multisampleDependent) then
+				local multisampleValue = GetApplicableMultisampleSetting();
+				for cvar_name, cvar_value in pairs(value.cvars) do
+					local capValue = GetMaxMultisampleFormatOnCvar(cvar_name, cvar_value);
+					if ( capValue < multisampleValue ) then
+						invalid = true;
+						errorValue = VRN_NOMULTISAMPLE.."|n";
+					end
+				end
+			end
 			if(not invalid and recommended) then
 				recommendedValue = value.text;
 			end
@@ -170,6 +181,7 @@ end
 
 function VideoOptionsPanel_Refresh(self)
 	Graphics_Refresh(self);
+	Graphics_MultiSampleDropDown:onCapCheck();
 end
 
 function Graphics_Refresh (self)
@@ -206,7 +218,7 @@ end
 
 function ControlCheckCapTargets(self)
 	for _, name in pairs(self.capTargets) do
-		frame = _G[name];
+		local frame = _G[name];
 		if ( frame and frame.onCapCheck ) then
 			frame.onCapCheck(frame);
 		end
@@ -218,13 +230,28 @@ function ControlGetCurrentCvarValue(self, checkCvar)
 	if ( self.data and self.data[value] ) then
 		for cvar, cvarValue in pairs(self.data[value].cvars) do
 			if ( cvar == checkCvar ) then
-				return cvarValue;
+				return cvarValue, value;
 			end
 		end
 	else
 		-- this means a custom cvar from config.wtf
 		return GetCVar(checkCvar);
 	end
+end
+
+function ControlGetActiveCvarValue(self, checkCvar)
+	local activeCVarValue = tonumber(GetCVar(checkCvar));
+	if ( self.data ) then
+		for i = 1, #self.data do
+			for cvar, cvarValue in pairs(self.data[i].cvars) do
+				if ( cvar == checkCvar and cvarValue == activeCVarValue ) then
+					return cvarValue, i;
+				end
+			end
+		end
+	end
+	-- this means a custom cvar from config.wtf
+	return GetCVar(checkCvar);
 end
 
 local function FinishChanges(self)
@@ -242,6 +269,12 @@ local function FinishChanges(self)
 		Graphics_Refresh(Graphics_);
 	end
 	Graphics_Quality:commitslider();
+	-- multisample stuff
+	Graphics_MultiSampleDropDown:onCapCheck();
+	for dropdown in pairs(Graphics_MultiSampleDropDown.cvarCaps) do
+		dropdown = _G[dropdown];
+		Graphics_PrepareTooltip(dropdown);
+	end
 end
 
 local function CommitChange(self)
@@ -406,6 +439,19 @@ function Graphics_TableGetValue(self)
 	return 1+#self.data;
 end
 -------------------------------------------------------------------------------------------------------
+-- We want to return the highest setting between the UI selection and what's currently being used
+-- because that will determine if we can switch some settings
+function GetApplicableMultisampleSetting()
+	local uiValue = VideoOptionsDropDownMenu_GetSelectedID(Graphics_MultiSampleDropDown);
+	local clientValue = GetCurrentMultisampleFormat(Graphics_PrimaryMonitorDropDown:GetValue());
+	if ( uiValue and clientValue ) then
+		return max(uiValue, clientValue);
+	else
+		return uiValue or clientValue;
+	end
+end
+
+-------------------------------------------------------------------------------------------------------
 -- OnClick handlers
 -- 
 function VideoOptions_OnClick(self, value)
@@ -437,6 +483,15 @@ function VideoOptions_OnClick(self, value)
 	end
 	if ( self.capTargets ) then
 		ControlCheckCapTargets(self);
+	end
+	-- multisample stuff
+	if ( self == Graphics_MultiSampleDropDown ) then
+		for key, cvar in pairs(self.cvarCaps) do
+			local dropDown = _G[key];
+			if ( dropDown ) then
+				Graphics_PrepareTooltip(dropDown);
+			end
+		end
 	end
 end
 
@@ -595,6 +650,12 @@ function VideoOptionsDropDown_OnLoad(self)
 				self.tooltiprefresh = false;
 				Graphics_PrepareTooltip(self);
 			end
+
+			local multisampleValue;
+			if ( self.multisampleDependent ) then
+				multisampleValue = GetApplicableMultisampleSetting();
+			end
+
 			local p = self:GetValue();
 			for mode, text in ipairs(self.table) do
 				local info = VideoOptionsDropDownMenu_CreateInfo();
@@ -610,6 +671,13 @@ function VideoOptionsDropDown_OnLoad(self)
 							if(self.validity[cvar_name][cvar_value] ~= 0) then
 								info.notClickable = true;
 								info.disablecolor = GREYCOLORCODE;
+							end
+							if(not info.notClickable and self.multisampleDependent) then
+								local capValue = GetMaxMultisampleFormatOnCvar(cvar_name, cvar_value);
+								if ( capValue < multisampleValue ) then
+									info.notClickable = true;
+									info.disablecolor = GREYCOLORCODE;
+								end
 							end
 							if(DefaultVideoOptions[cvar_name] ~= cvar_value) then
 								recommended = false;
@@ -734,7 +802,7 @@ function VideoOptionsPanel_OnShow(self)
 end
 
 function Graphics_OnLoad (self)
-	if(IsGMClient() and InGlue()) then
+	if(nil and IsGMClient() and InGlue()) then
 		local qualityNames =
 		{
 			VIDEO_QUALITY_LABEL1,
@@ -756,7 +824,7 @@ function Graphics_OnLoad (self)
 					if(VideoData[key].data[j].text == value) then
 						for cvar, cvar_value in pairs(VideoData[key].data[j].cvars) do
 							if(ThisVideoOptions[cvar] ~= cvar_value) then
-								print("mismatch " .. key .. "[" .. qualityNames[i] .. "]:" .. cvar .. ", c++:" .. ThisVideoOptions[cvar] .. " ~= lua:" .. cvar_value);
+--								print("mismatch " .. key .. "[" .. qualityNames[i] .. "]:" .. cvar .. ", c++:" .. ThisVideoOptions[cvar] .. " ~= lua:" .. cvar_value);
 								VideoData[key].data[j].cvars[cvar] = ThisVideoOptions[cvar];
 							end
 						end
@@ -833,10 +901,18 @@ function LanguagePanel_Cancel (self)
 	end
 end
 
+function LanguagePanel_Okay (self)
+	local languageDropDown = InterfaceOptionsLanguagesPanelLocaleDropDown;
+	if (languageDropDown.value ~= languageDropDown.oldValue) then
+		languageDropDown.oldValue = languageDropDown.value;
+	end
+	BlizzardOptionsPanel_Okay(self);
+end
+
 function InterfaceOptionsLanguagesPanel_OnLoad (self)
 	self.name = LANGUAGES_LABEL;
 	self.options = LanguagesPanelOptions;
-	BlizzardOptionsPanel_OnLoad(self, nil, LanguagePanel_Cancel, BlizzardOptionsPanel_Default, BlizzardOptionsPanel_Refresh);
+	BlizzardOptionsPanel_OnLoad(self, LanguagePanel_Okay, LanguagePanel_Cancel, BlizzardOptionsPanel_Default, BlizzardOptionsPanel_Refresh);
 	OptionsFrame_AddCategory(VideoOptionsFrame, self);
 end
 
@@ -905,6 +981,7 @@ LanguageRegions["esMX"] = 10;
 LanguageRegions["ruRU"] = 11;
 LanguageRegions["ptBR"] = 12;
 LanguageRegions["ptPT"] = 13;
+LanguageRegions["itIT"] = 14;
 
 LANGUAGE_TEXT_HEIGHT = 22/512;
 

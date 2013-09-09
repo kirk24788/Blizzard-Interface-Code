@@ -78,11 +78,13 @@ COMBAT_TEXT_TYPE_INFO["RUNE"] = {r = 0.1, g = 0.1, b = 1, var = "COMBAT_TEXT_SHO
 COMBAT_TEXT_TYPE_INFO["PERIODIC_HEAL_ABSORB"] = {r = 0.1, g = 1, b = 0.1, show = 1};
 COMBAT_TEXT_TYPE_INFO["HEAL_CRIT_ABSORB"] = {r = 0.1, g = 1, b = 0.1, show = 1};
 COMBAT_TEXT_TYPE_INFO["HEAL_ABSORB"] = {r = 0.1, g = 1, b = 0.1, show = 1};
+COMBAT_TEXT_TYPE_INFO["ABSORB_ADDED"] = {r = 0.1, g = 1, b = 0.1, show = 1};
 
 COMBAT_TEXT_RUNE = {};
 COMBAT_TEXT_RUNE[1] = COMBAT_TEXT_RUNE_BLOOD;
 COMBAT_TEXT_RUNE[2] = COMBAT_TEXT_RUNE_UNHOLY;
 COMBAT_TEXT_RUNE[3] = COMBAT_TEXT_RUNE_FROST;
+COMBAT_TEXT_RUNE[4] = COMBAT_TEXT_RUNE_DEATH;
 
 function CombatText_OnLoad(self)
 	CombatText_UpdateDisplayedMessages();
@@ -192,7 +194,11 @@ function CombatText_OnEvent(self, event, ...)
 	if ( not info.show ) then
 		-- When Resists aren't being shown, partial resists should display as Damage
 		if (info.var == "COMBAT_TEXT_SHOW_RESISTANCES" and arg3) then
-			messageType = "DAMAGE";
+			if ( strsub(messageType, 1, 5) == "SPELL" ) then
+				messageType = arg4 and "SPELL_DAMAGE_CRIT" or "SPELL_DAMAGE";
+			else
+				messageType = arg4 and "DAMAGE_CRIT" or "DAMAGE";
+			end
 		else
 			return;
 		end
@@ -203,12 +209,12 @@ function CombatText_OnEvent(self, event, ...)
 	
 	elseif ( messageType == "DAMAGE_CRIT" or messageType == "SPELL_DAMAGE_CRIT" ) then
 		displayType = "crit";
-		message = "-"..data;
+		message = "-"..BreakUpLargeNumbers(data);
 	elseif ( messageType == "DAMAGE" or messageType == "SPELL_DAMAGE" or messageType == "DAMAGE_SHIELD" ) then
 		if (data == 0) then
 			return
 		end
-		message = "-"..data;
+		message = "-"..BreakUpLargeNumbers(data);
 	elseif ( messageType == "SPELL_CAST" ) then
 		message = "<"..data..">";
 	elseif ( messageType == "SPELL_AURA_START" ) then
@@ -219,44 +225,45 @@ function CombatText_OnEvent(self, event, ...)
 		message = format(AURA_END, data);
 	elseif ( messageType == "HEAL" or messageType == "PERIODIC_HEAL") then
 		if ( COMBAT_TEXT_SHOW_FRIENDLY_NAMES == "1" and messageType == "HEAL" and UnitName(self.unit) ~= data ) then
-			message = "+"..arg3.." ["..data.."]";
+			message = "+"..BreakUpLargeNumbers(arg3).." ["..data.."]";
 		else
-			message = "+"..arg3;
+			message = "+"..BreakUpLargeNumbers(arg3);
 		end
 	elseif ( messageType == "HEAL_ABSORB" or messageType == "PERIODIC_HEAL_ABSORB") then
 		if ( COMBAT_TEXT_SHOW_FRIENDLY_NAMES == "1" and messageType == "HEAL_ABSORB" and UnitName(self.unit) ~= data ) then
-			message = "+"..arg3.." ["..data.."] "..format(ABSORB_TRAILER, arg4);
+			message = "+"..BreakUpLargeNumbers(arg3).." ["..data.."] "..format(ABSORB_TRAILER, arg4);
 		else
-			message = "+"..arg3.." "..format(ABSORB_TRAILER, arg4);
+			message = "+"..BreakUpLargeNumbers(arg3).." "..format(ABSORB_TRAILER, arg4);
 		end
 	elseif ( messageType == "HEAL_CRIT" ) then
 		displayType = "crit";
 		if ( COMBAT_TEXT_SHOW_FRIENDLY_NAMES == "1" and UnitName(self.unit) ~= data ) then
-			message = "+"..arg3.." ["..data.."]";
+			message = "+"..BreakUpLargeNumbers(arg3).." ["..data.."]";
 		else
-			message = "+"..arg3;
+			message = "+"..BreakUpLargeNumbers(arg3);
 		end
 	elseif ( messageType == "HEAL_CRIT_ABSORB" ) then
 		displayType = "crit";
 		if ( COMBAT_TEXT_SHOW_FRIENDLY_NAMES == "1" and UnitName(self.unit) ~= data ) then
-			message = "+"..arg3.." ["..data.."] "..format(ABSORB_TRAILER, arg4);
+			message = "+"..BreakUpLargeNumbers(arg3).." ["..data.."] "..format(ABSORB_TRAILER, arg4);
 		else
-			message = "+"..arg3.." "..format(ABSORB_TRAILER, arg4);
+			message = "+"..BreakUpLargeNumbers(arg3).." "..format(ABSORB_TRAILER, arg4);
 		end
 	elseif ( messageType == "ENERGIZE" or messageType == "PERIODIC_ENERGIZE") then
 		local count =  tonumber(data) 
 		if (count > 0 ) then
-			data = "+"..data;
+			data = "+"..BreakUpLargeNumbers(data);
 		end
 		if( arg3 == "MANA"
 			or arg3 == "RAGE"
 			or arg3 == "FOCUS"
 			or arg3 == "ENERGY"
 			or arg3 == "RUNIC_POWER"
-			or arg3 == "SOUL_SHARDS" ) then
+			or arg3 == "SOUL_SHARDS"
+			or arg3 == "CHI" ) then
 			message = data.." ".._G[arg3];
 			info = PowerBarColor[arg3];
-		elseif ( arg3 == "HOLY_POWER" and PaladinPowerBar:IsShown() and PaladinPowerBar:GetAlpha() > 0.5 ) then
+		elseif ( arg3 == "HOLY_POWER" ) then
 			local numHolyPower = UnitPower( PaladinPowerBar:GetParent().unit, SPELL_POWER_HOLY_POWER );
 			message = "<"..numHolyPower.." ".._G[arg3]..">";
 			info = PowerBarColor[arg3];
@@ -344,6 +351,12 @@ function CombatText_OnEvent(self, event, ...)
 			end
 		else
 			message = nil;
+		end
+	elseif (messageType == "ABSORB_ADDED") then
+		if ( COMBAT_TEXT_SHOW_FRIENDLY_NAMES == "1" and UnitName(self.unit) ~= data ) then
+			message = "+"..BreakUpLargeNumbers(arg3).."("..COMBAT_TEXT_ABSORB..")".." ["..data.."]";
+		else
+			message = "+"..BreakUpLargeNumbers(arg3).."("..COMBAT_TEXT_ABSORB..")";
 		end
 	else 
 		message = _G["COMBAT_TEXT_"..messageType];

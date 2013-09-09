@@ -83,6 +83,9 @@ local DIRECT_MACRO_CONDITIONAL_NAMES = {
     "GetMouseButtonClicked", "GetActionBarPage", "GetBonusBarOffset",
     "IsMounted", "IsSwimming", "IsSubmerged", "IsFlying", "IsFlyableArea",
     "IsIndoors", "IsOutdoors",
+	"HasVehicleActionBar", "HasOverrideActionBar", "HasTempShapeshiftActionBar",
+	"HasOverrideUI", "GetVehicleBarIndex", "GetOverrideBarIndex",
+	"HasExtraActionBar", "GetTempShapeshiftBarIndex", "CanExitVehicle"
 };
 
 local OTHER_SAFE_FUNCTION_NAMES = {
@@ -125,8 +128,8 @@ function ENV.PlayerInCombat()
 end
 
 function ENV.PlayerInGroup()
-    return ( GetNumRaidMembers() > 0 and "raid" )
-        or ( GetNumPartyMembers() > 0 and "party" )
+    return ( IsInRaid() and "raid" )
+        or ( IsInGroup() and "party" )
 end
 
 function ENV.UnitHasVehicleUI(unit)

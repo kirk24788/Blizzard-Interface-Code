@@ -256,6 +256,7 @@
 -->
 	<Frame name="GuildRosterFrame" parent="GuildFrame" setAllPoints="true" hidden="true">
 		<Frames>
+			<Frame name="GuildMemberDropDown" inherits="UIDropDownMenuTemplate"/>
 			<Frame name="GuildRosterViewDropdown" inherits="UIDropDownMenuTemplate">
 				<Anchors>
 					<Anchor point="TOPRIGHT">
@@ -426,10 +427,8 @@
 		</Backdrop>
 		<Layers>
 			<Layer level="ARTWORK">
-				<FontString name="GuildMemberDetailName" inherits="GameFontNormal">
-					<Size>
-						<AbsDimension x="0" y="12"/>
-					</Size>
+				<FontString name="GuildMemberDetailName" justifyH="LEFT" inherits="GameFontNormal">
+					<Size x="165" y="0"/>
 					<Anchors>
 						<Anchor point="TOPLEFT">
 							<Offset>
@@ -557,6 +556,12 @@
 						</Offset>
 					</Anchor>
 				</Anchors>
+				<Scripts>
+					<OnClick>
+						PlaySound("igMainMenuOptionCheckBoxOn");
+						HideParentPanel(self);
+					</OnClick>
+				</Scripts>
 			</Button>
 			<Button name="GuildMemberRemoveButton" inherits="UIPanelButtonTemplate" text="REMOVE">
 				<Size>
@@ -595,7 +600,7 @@
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						InviteUnit(GuildFrame.selectedName);
+						InviteToGroup(GuildFrame.selectedName);
 					</OnClick>
 					<OnEnter>
 						GameTooltip_AddNewbieTip(self, GROUP_INVITE, 1.0, 1.0, 1.0, NEWBIE_TOOLTIP_GROUPINVITE, 1);

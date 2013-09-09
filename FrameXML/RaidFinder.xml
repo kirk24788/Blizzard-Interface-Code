@@ -1,7 +1,11 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/
 ..\FrameXML\UI.xsd">
 	<Script file="RaidFinder.lua"/>
-	<Frame name="RaidFinderFrame" useParentLevel="true" setAllPoints="true" parent="RaidParentFrame">
+	<Frame name="RaidFinderFrame" useParentLevel="true" parent="GroupFinderFrame" hidden="true">
+		<Size x="338" y="428"/>
+		<Anchors>
+			<Anchor point="TOPLEFT" x="224" y="0"/>
+		</Anchors>
 		<Layers>
 			<Layer level="BACKGROUND">
 				<!--Texture name="$parentRoleBackground" file="Interface\LFGFrame\UI-LFG-BlueBG">
@@ -22,15 +26,60 @@
 					</Gradient>
 				</Texture>
 			</Layer>
+			<Layer level="BORDER">
+				<Texture name="$parentBtnCornerRight" inherits="UI-Frame-BtnCornerRight" hidden="false">
+					<Anchors>
+						<Anchor point="BOTTOMRIGHT" x="0" y="-1"/>
+					</Anchors>
+				</Texture>
+				<Texture name="$parentButtonBottomBorder" inherits="_UI-Frame-BtnBotTile">
+					<Anchors>
+						<Anchor point="BOTTOMLEFT" x="-23" y="2"/>
+						<Anchor point="BOTTOMRIGHT" relativeTo="$parentBtnCornerRight" relativePoint="BOTTOMLEFT"/>
+					</Anchors>
+				</Texture>
+			</Layer>
 		</Layers>
 		<Frames>
-			<Frame name="$parentRoleInset" useParentLevel="true" inherits="InsetFrameTemplate">
+			<Frame parentKey="NoRaidsCover" enableMouse="true" hidden="true" topLevel="true">
+				<Anchors>
+					<Anchor point="TOPRIGHT" x="-6" y="-25"/>
+					<Anchor point="BOTTOMLEFT" x="3" y="4"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<Texture>
+							<Color r="0" g="0" b="0" a="0.8"/>
+						</Texture>
+					</Layer>
+					<Layer level="ARTWORK">
+						<FontString parentKey="Label" inherits="GameFontNormalLarge" justifyH="CENTER" justifyV="MIDDLE">
+							<Size x="320" y="0"/>
+							<Anchors>
+								<Anchor point="CENTER"/>
+							</Anchors>
+						</FontString>
+					</Layer>
+				</Layers>
+			</Frame>
+			<Frame name="$parentRoleInset" useParentLevel="true" inherits="InsetFrameTemplate" parentKey="Inset">
 				<Anchors>
 					<Anchor point="TOPLEFT" x="4" y="-26" />
-					<Anchor point="BOTTOMRIGHT" relativeTo="$parent" relativePoint="TOPRIGHT" x="-6" y="-107" />
+					<Anchor point="BOTTOMRIGHT" relativeTo="$parent" relativePoint="TOPRIGHT" x="-6" y="-109" />
 				</Anchors>
 			</Frame>
-			<Frame name="RaidFinderQueueFrame" setAllPoints="true">
+			<Frame name="$parentBottomInset" useParentLevel="true" inherits="InsetFrameTemplate">
+				<Size x="217" y="496"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="2" y="-144" />
+					<Anchor point="BOTTOMRIGHT" x="-4" y="26" />
+				</Anchors>
+			</Frame>
+			<Frame name="RaidFinderQueueFrame">
+				<Size x="338" y="428"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="0" y="-2"/>
+				</Anchors>
 				<Layers>
 					<Layer level="BORDER">
 						<Texture name="$parentBackground" file="Interface\LFGFrame\UI-LFG-BACKGROUND-QUESTPAPER">
@@ -48,11 +97,11 @@
 					</Layer>
 				</Layers>
 				<Frames>
-					<Button name="$parentRoleButtonTank" inherits="LFGRoleButtonWithBackgroundTemplate" id="2">
+					<Button name="$parentRoleButtonTank" inherits="LFGRoleButtonWithBackgroundAndRewardTemplate" id="2">
 						<Anchors>
 							<Anchor point="BOTTOMLEFT">
 								<Offset>
-									<AbsDimension x="50" y="334"/>
+									<AbsDimension x="50" y="336"/>
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -65,7 +114,7 @@
 							</OnLoad>
 						</Scripts>
 					</Button>
-					<Button name="$parentRoleButtonHealer" inherits="LFGRoleButtonWithBackgroundTemplate" id="3">
+					<Button name="$parentRoleButtonHealer" inherits="LFGRoleButtonWithBackgroundAndRewardTemplate" id="3">
 						<Anchors>
 							<Anchor point="LEFT" relativeTo="$parentRoleButtonTank" relativePoint="RIGHT">
 								<Offset>
@@ -82,7 +131,7 @@
 							</OnLoad>
 						</Scripts>
 					</Button>
-					<Button name="$parentRoleButtonDPS" inherits="LFGRoleButtonWithBackgroundTemplate" id="1">
+					<Button name="$parentRoleButtonDPS" inherits="LFGRoleButtonWithBackgroundAndRewardTemplate" id="1">
 						<Anchors>
 							<Anchor point="LEFT" relativeTo="$parentRoleButtonHealer" relativePoint="RIGHT">
 								<Offset>
@@ -123,7 +172,7 @@
 						<Anchors>
 							<Anchor point="BOTTOMLEFT">
 								<Offset>
-									<AbsDimension x="117" y="283"/>
+									<AbsDimension x="117" y="287"/>
 								</Offset>
 							</Anchor>
 						</Anchors>
@@ -231,7 +280,7 @@
 							</Frame>
 						</ScrollChild>
 					</ScrollFrame>
-					<Frame name="$parentPartyBackfill" hidden="true" enableMouse="true">
+					<Frame name="$parentPartyBackfill" inherits="LFGBackfillCoverTemplate">
 						<Size>
 							<AbsDimension x="330" y="257"/>
 						</Size>
@@ -242,78 +291,13 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-						<Layers>
-							<Layer level="BACKGROUND">
-								<Texture name="$parentBlackFilter" setAllPoints="true">
-									<Color r="0" b="0" g="0" a="0.93"/>
-								</Texture>
-							</Layer>
-							<Layer level="ARTWORK">
-								<FontString name="$parentDescription" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="300" y="0"/>
-									</Size>
-									<Anchors>
-										<Anchor point="TOP">
-											<Offset>
-												<AbsDimension x="-0" y="-70"/>
-											</Offset>
-										</Anchor>
-									</Anchors>
-								</FontString>
-							</Layer>
-						</Layers>
-						<Frames>
-							<Button name="$parentBackfillButton" inherits="UIPanelButtonTemplate2" text="YES">
-								<Size>
-									<AbsDimension x="153" y="22"/>
-								</Size>
-								<Anchors>
-									<Anchor point="TOPRIGHT" relativeTo="$parentDescription" relativePoint="BOTTOM">
-										<Offset>
-											<AbsDimension x="-5" y="-10"/>
-										</Offset>
-									</Anchor>
-								</Anchors>
-								<Scripts>
-									<OnClick>
-										StaticPopup_Hide("LFG_OFFER_CONTINUE");
-										PartyLFGStartBackfill();											
-									</OnClick>
-								</Scripts>
-							</Button>
-							<Button name="$parentNoBackfillButton" inherits="UIPanelButtonTemplate2" text="HIDE">
-								<Size>
-									<AbsDimension x="153" y="22"/>
-								</Size>
-								<Anchors>
-									<Anchor point="TOPLEFT" relativeTo="$parentDescription" relativePoint="BOTTOM">
-										<Offset>
-											<AbsDimension x="5" y="-10"/>
-										</Offset>
-									</Anchor>
-								</Anchors>
-								<Scripts>
-									<OnClick>
-										PlaySound("UChatScrollButton");
-										self:GetParent():Hide();
-									</OnClick>
-								</Scripts>
-							</Button>
-						</Frames>
 						<Scripts>
-							<OnShow>
-								RaidFinderFrameFindRaidButton_Update();
-							</OnShow>
-							<OnHide>
-								RaidFinderFrameFindRaidButton_Update();
-							</OnHide>
 							<OnLoad>
-								self:SetFrameLevel(14);
+								LFGBackfillCover_SetUp(self, {LFG_SUBTYPEID_RAID}, LE_LFG_CATEGORY_RF, RaidFinderFrameFindRaidButton_Update);
 							</OnLoad>
 						</Scripts>
 					</Frame>
-					<Frame name="$parentCooldownFrame" hidden="true" enableMouse="true">
+					<Frame name="$parentCooldownFrame" parentKey="CooldownFrame" inherits="LFGCooldownCoverTemplate">
 						<Size>
 							<AbsDimension x="330" y="257"/>
 						</Size>
@@ -324,116 +308,11 @@
 								</Offset>
 							</Anchor>
 						</Anchors>
-						<Layers>
-							<Layer level="BACKGROUND">
-								<Texture name="$parentBlackFilter" setAllPoints="true">
-									<Color r="0" b="0" g="0" a="0.93"/>
-								</Texture>
-							</Layer>
-							<Layer level="ARTWORK">
-								<FontString name="$parentDescription" parentKey="description" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="300" y="0"/>
-									</Size>
-									<Anchors>
-										<Anchor point="TOP">
-											<Offset>
-												<AbsDimension x="0" y="-30"/>
-											</Offset>
-										</Anchor>
-									</Anchors>
-								</FontString>
-								<FontString name="$parentTime" parentKey="time" inherits="GameFontHighlightLarge" justifyH="CENTER">
-									<Anchors>
-										<Anchor point="TOP" relativeTo="$parentDescription" relativePoint="BOTTOM">
-											<Offset>
-												<AbsDimension x="0" y="-10"/>
-											</Offset>
-										</Anchor>
-									</Anchors>
-								</FontString>
-								<FontString name="$parentSecondaryDescription" parentKey="secondaryDescription" inherits="GameFontNormal" text="RF_DESERTER_OTHER" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="300" y="0"/>
-									</Size>
-									<Anchors>
-										<Anchor point="TOP" relativeTo="$parentTime" relativePoint="BOTTOM">
-											<Offset>
-												<AbsDimension x="0" y="-10"/>
-											</Offset>
-										</Anchor>
-									</Anchors>
-								</FontString>
-								<FontString name="$parentName1" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="120" y="0"/>
-									</Size>
-									<!--Anchored in script-->
-								</FontString>
-								<FontString name="$parentName2" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="120" y="0"/>
-									</Size>
-									<!--Anchored in script-->
-								</FontString>
-								<FontString name="$parentName3" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="120" y="0"/>
-									</Size>
-									<!--Anchored in script-->
-								</FontString>
-								<FontString name="$parentName4" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="120" y="0"/>
-									</Size>
-									<!--Anchored in script-->
-								</FontString>
-								<FontString name="$parentName5" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="120" y="0"/>
-									</Size>
-									<!--Anchored in script-->
-								</FontString>
-								<FontString name="$parentName6" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="120" y="0"/>
-									</Size>
-									<!--Anchored in script-->
-								</FontString>
-								<FontString name="$parentName7" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="120" y="0"/>
-									</Size>
-									<!--Anchored in script-->
-								</FontString>
-								<FontString name="$parentName8" inherits="GameFontNormal" justifyH="CENTER">
-									<Size>
-										<AbsDimension x="120" y="0"/>
-									</Size>
-									<!--Anchored in script-->
-								</FontString>
-							</Layer>
-						</Layers>
-						<Frames>
-							<Frame name="$parentAdditionalPlayersFrame" parentKey="additionalPlayersFrame">
-								<Size x="240" y="32"/>
-								<Anchors>
-									<Anchor point="BOTTOM" x="0" y="15"/>
-								</Anchors>
-								<Layers>
-									<Layer level="ARTWORK">
-										<FontString name="$parentText" inherits="GameFontNormal" justifyH="CENTER" setAllPoints="true" parentKey="text"/>
-									</Layer>
-								</Layers>
-								<Scripts>
-									<OnEnter function="RaidFinderQueueFrameCooldownAdditionalPlayers_OnEnter"/>
-									<OnLeave function="GameTooltip_Hide"/>
-								</Scripts>
-							</Frame>
-						</Frames>
 						<Scripts>
-							<OnLoad function="RaidFinderQueueFrameCooldownFrame_OnLoad"/>
-							<OnEvent function="RaidFinderQueueFrameCooldownFrame_OnEvent"/>
+							<OnLoad>
+								LFGCooldownCover_SetUp(self, self:GetParent().PartyBackfill);
+								LFGCooldownCover_ChangeSettings(self, false, false);
+							</OnLoad>
 							<OnShow>
 								RaidFinderFrameFindRaidButton_Update();
 							</OnShow>
@@ -475,7 +354,7 @@
 							</Layer>
 						</Layers>
 						<Frames>
-							<Button name="$parentLeaveQueueButton" inherits="UIPanelButtonTemplate2" parentKey="leaveQueueButton">
+							<Button name="$parentLeaveQueueButton" inherits="UIPanelButtonTemplate" parentKey="leaveQueueButton">
 								<Size>
 									<AbsDimension x="153" y="22"/>
 								</Size>
@@ -504,29 +383,16 @@
 			<Button name="$parentFindRaidButton" inherits="MagicButtonTemplate" text="FIND_RAID">
 				<Size x="135" y="22"/>
 				<Anchors>
-					<Anchor point="BOTTOMLEFT"/>
+					<Anchor point="BOTTOM" x="0" y="4"/>
 				</Anchors>
 				<Scripts>
 					<OnClick>
-						local mode, subMode = GetLFGMode();
+						local mode, subMode = GetLFGMode(LE_LFG_CATEGORY_RF, RaidFinderQueueFrame.raid);
 						if ( mode == "queued" or mode == "listed" or mode == "rolecheck" or mode == "suspended" ) then
-							LeaveLFG();
+							LeaveSingleLFG(LE_LFG_CATEGORY_RF, RaidFinderQueueFrame.raid);
 						else
 							RaidFinderQueueFrame_Join();
 						end
-					</OnClick>
-				</Scripts>
-			</Button>
-			<Button name="$parentCancelButton" inherits="MagicButtonTemplate" text="CLOSE">
-				<Size>
-					<AbsDimension x="112" y="22"/>
-				</Size>
-				<Anchors>
-					<Anchor point="BOTTOMRIGHT"/>
-				</Anchors>
-				<Scripts>
-					<OnClick>
-						HideUIPanel(self:GetParent():GetParent())
 					</OnClick>
 				</Scripts>
 			</Button>

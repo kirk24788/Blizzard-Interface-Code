@@ -3,11 +3,9 @@ NUM_PET_STATS = 5;
 
 PETPAPERDOLL_STATCATEGORY_DEFAULTORDER = {
 	"GENERAL",
-	--"ATTRIBUTES",  --Not shown as Pet Attributes are now meaningless
 	"MELEE",
 	"SPELL",
 	"DEFENSE",
-	"RESISTANCE",
 };
 
 function PetPaperDollFrame_OnLoad (self)
@@ -16,7 +14,6 @@ function PetPaperDollFrame_OnLoad (self)
 	self:RegisterEvent("PET_UI_CLOSE");
 	self:RegisterEvent("UNIT_NAME_UPDATE");
 	self:RegisterEvent("UNIT_PET");
-	self:RegisterEvent("UNIT_PET_EXPERIENCE");
 	self:RegisterEvent("UNIT_MODEL_CHANGED");
 	self:RegisterEvent("UNIT_LEVEL");
 	self:RegisterEvent("UNIT_RESISTANCES");
@@ -31,8 +28,6 @@ function PetPaperDollFrame_OnLoad (self)
 	self:RegisterEvent("PLAYER_ENTERING_WORLD");
 	self:RegisterEvent("PET_SPELL_POWER_UPDATE");
 	self:RegisterEvent("VARIABLES_LOADED");
-
-	SetTextStatusBarTextPrefix(PetPaperDollFrameExpBar, XP);
 end
 
 function PetPaperDollFrame_UpdateIsAvailable()
@@ -52,8 +47,8 @@ end
 
 -- This makes sure the update only happens once at the end of the frame
 function PetPaperDollFrame_QueuedUpdate(self)
-	PetPaperDollFrame_Update();
 	self:SetScript("OnUpdate", nil);
+	PetPaperDollFrame_Update();
 end
 
 function PetPaperDollFrame_OnEvent (self, event, ...)
@@ -65,8 +60,6 @@ function PetPaperDollFrame_OnEvent (self, event, ...)
 		else
 			PetPaperDollFrame_UpdateIsAvailable();
 		end
-	elseif ( event == "UNIT_PET_EXPERIENCE" ) then
-		PetExpBar_Update();
 	elseif( event == "PET_SPELL_POWER_UPDATE" ) then
 		if (self:IsVisible()) then
 			self:SetScript("OnUpdate", PetPaperDollFrame_QueuedUpdate);
@@ -80,6 +73,7 @@ function PetPaperDollFrame_OnEvent (self, event, ...)
 			end
 			PaperDoll_InitStatCategories(PETPAPERDOLL_STATCATEGORY_DEFAULTORDER, "petStatCategoryOrder", "petStatCategoriesCollapsed", "pet");
 		end
+		PetPaperDollFrame_UpdateIsAvailable();
 	elseif ( arg1 == "pet" ) then
 		if (self:IsVisible()) then
 			self:SetScript("OnUpdate", PetPaperDollFrame_QueuedUpdate);
@@ -129,7 +123,6 @@ function PetPaperDollFrame_Update()
 		PetLevelText:SetFormattedText(UNIT_TYPE_LEVEL_TEMPLATE,UnitLevel("pet"),UnitCreatureFamily("pet"));
 	end
 	CharacterFrameTitleText:SetText(UnitName("pet"));
-	PetExpBar_Update();
 	PaperDollFrame_UpdateStats();
 	
 	local _, playerClass = UnitClass("player");
@@ -154,10 +147,4 @@ function PetPaperDollFrame_Update()
 	else
 		PetPaperDollPetInfo:Hide();
 	end
-end
-
-function PetExpBar_Update()
-	local currXP, nextXP = GetPetExperience();
-	PetPaperDollFrameExpBar:SetMinMaxValues(min(0, currXP), nextXP);
-	PetPaperDollFrameExpBar:SetValue(currXP);
 end

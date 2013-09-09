@@ -107,7 +107,7 @@
 		<Layers>
 			<Layer level="ARTWORK">
 				<Texture file="Interface\Minimap\POIIcons" setAllPoints="true">
-					<TexCoords left="0.56640625" right="0.6328125" top="0.00390625" bottom="0.0703125"/>
+					<TexCoords left="0.56640625" right="0.6328125" top="0.001953125" bottom="0.03515625"/>
 				</Texture>
 			</Layer>
 		</Layers>
@@ -225,6 +225,8 @@
 				self.zoneID = MAELSTROM_ZONES_ID[zoneName];
 				self.minLevel = MAELSTROM_ZONES_LEVELS[zoneName].minLevel;
 				self.maxLevel = MAELSTROM_ZONES_LEVELS[zoneName].maxLevel;
+				self.petMinLevel = MAELSTROM_ZONES_LEVELS[zoneName].petMinLevel;
+				self.petMaxLevel = MAELSTROM_ZONES_LEVELS[zoneName].petMaxLevel;
 			</OnLoad>
 			<OnClick>
 				if ( button == "LeftButton" ) then
@@ -237,11 +239,15 @@
 				WorldMapFrame.maelstromZoneText = GetMapNameByID(self.zoneID);
 				WorldMapFrame.minLevel = self.minLevel;
 				WorldMapFrame.maxLevel = self.maxLevel;
+				WorldMapFrame.petMinLevel = self.petMinLevel;
+				WorldMapFrame.petMaxLevel = self.petMaxLevel;
 			</OnEnter>
 			<OnLeave>
 				WorldMapFrame.maelstromZoneText = nil;
 				WorldMapFrame.minLevel = nil;
 				WorldMapFrame.maxLevel = nil;
+				WorldMapFrame.petMinLevel = nil;
+				WorldMapFrame.petMaxLevel = nil;
 			</OnLeave>
 		</Scripts>
 	</Button>

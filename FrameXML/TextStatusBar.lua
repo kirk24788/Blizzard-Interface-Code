@@ -23,7 +23,7 @@ function TextStatusBar_OnEvent(self, event, ...)
 				end
 			end
 			TextStatusBar_UpdateTextString(self);
-		elseif ( cvar == "STATUS_TEXT_PERCENT" ) then
+		elseif ( cvar == "STATUS_TEXT_DISPLAY" ) then
 			TextStatusBar_UpdateTextString(self);
 		end
 	end
@@ -41,18 +41,44 @@ end
 function TextStatusBar_UpdateTextStringWithValues(statusFrame, textString, value, valueMin, valueMax)
 	if ( ( tonumber(valueMax) ~= valueMax or valueMax > 0 ) and not ( statusFrame.pauseUpdates ) ) then
 		statusFrame:Show();
-		if ( value and valueMax > 0 and ( GetCVarBool("statusTextPercentage") or statusFrame.showPercentage ) and not statusFrame.showNumeric) then
+		if ( (statusFrame.cvar and GetCVar(statusFrame.cvar) == "1" and statusFrame.textLockable) or statusFrame.forceShow ) then
+			textString:Show();
+		elseif ( statusFrame.lockShow > 0 and (not statusFrame.forceHideText) ) then
+			textString:Show();
+		else
+			textString:SetText("");
+			textString:Hide();
+			return;
+		end
+
+		local valueDisplay = value;
+		local valueMaxDisplay = valueMax;
+		if ( statusFrame.capNumericDisplay ) then
+			valueDisplay = AbbreviateLargeNumbers(value);
+			valueMaxDisplay = AbbreviateLargeNumbers(valueMax);
+		else
+			valueDisplay = BreakUpLargeNumbers(value);
+			valueMaxDisplay = BreakUpLargeNumbers(valueMax);
+		end
+
+		local textDisplay = GetCVar("statusTextDisplay");
+		if ( value and valueMax > 0 and ( textDisplay ~= "NUMERIC" or statusFrame.showPercentage ) and not statusFrame.showNumeric) then
 			if ( value == 0 and statusFrame.zeroText ) then
 				textString:SetText(statusFrame.zeroText);
 				statusFrame.isZero = 1;
 				textString:Show();
 				return;
 			end
-			value = tostring(math.ceil((value / valueMax) * 100)) .. "%";
-			if ( statusFrame.prefix and (statusFrame.alwaysPrefix or not (statusFrame.cvar and GetCVar(statusFrame.cvar) == "1" and statusFrame.textLockable) ) ) then
-				textString:SetText(statusFrame.prefix .. " " .. value);
+			if ( textDisplay == "BOTH" and not statusFrame.showPercentage) then
+				valueDisplay = "(" .. math.ceil((value / valueMax) * 100) .. "%) " .. valueDisplay .. " / " .. valueMaxDisplay;
+				textString:SetText(valueDisplay);
 			else
-				textString:SetText(value);
+				valueDisplay = math.ceil((value / valueMax) * 100) .. "%";
+				if ( statusFrame.prefix and (statusFrame.alwaysPrefix or not (statusFrame.cvar and GetCVar(statusFrame.cvar) == "1" and statusFrame.textLockable) ) ) then
+					textString:SetText(statusFrame.prefix .. " " .. valueDisplay);
+				else
+					textString:SetText(valueDisplay);
+				end
 			end
 		elseif ( value == 0 and statusFrame.zeroText ) then
 			textString:SetText(statusFrame.zeroText);
@@ -61,23 +87,11 @@ function TextStatusBar_UpdateTextStringWithValues(statusFrame, textString, value
 			return;
 		else
 			statusFrame.isZero = nil;
-			if ( statusFrame.capNumericDisplay ) then
-				value = TextStatusBar_CapDisplayOfNumericValue(value);
-				valueMax = TextStatusBar_CapDisplayOfNumericValue(valueMax);
-			end
 			if ( statusFrame.prefix and (statusFrame.alwaysPrefix or not (statusFrame.cvar and GetCVar(statusFrame.cvar) == "1" and statusFrame.textLockable) ) ) then
-				textString:SetText(statusFrame.prefix.." "..value.." / "..valueMax);
+				textString:SetText(statusFrame.prefix.." "..valueDisplay.." / "..valueMaxDisplay);
 			else
-				textString:SetText(value.." / "..valueMax);
+				textString:SetText(valueDisplay.." / "..valueMaxDisplay);
 			end
-		end
-		
-		if ( (statusFrame.cvar and GetCVar(statusFrame.cvar) == "1" and statusFrame.textLockable) or statusFrame.forceShow ) then
-			textString:Show();
-		elseif ( statusFrame.lockShow > 0 and (not statusFrame.forceHideText) ) then
-			textString:Show();
-		else
-			textString:Hide();
 		end
 	else
 		textString:Hide();
@@ -88,17 +102,6 @@ function TextStatusBar_UpdateTextStringWithValues(statusFrame, textString, value
 			statusFrame:SetValue(0);
 		end
 	end
-end
-
-function TextStatusBar_CapDisplayOfNumericValue(value)
-	local strLen = strlen(value);
-	local retString = value;
-	if ( strLen > 8 ) then
-		retString = string.sub(value, 1, -7)..SECOND_NUMBER_CAP;
-	elseif ( strLen > 5 ) then
-		retString = string.sub(value, 1, -4)..FIRST_NUMBER_CAP;
-	end
-	return retString;
 end
 
 function TextStatusBar_OnValueChanged(self)

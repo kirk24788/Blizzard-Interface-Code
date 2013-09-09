@@ -18,6 +18,7 @@ VideoData["Graphics_Quality"]={
 				Graphics_LiquidDetailDropDown = VIDEO_OPTIONS_LOW,
 				Graphics_SunshaftsDropDown = VIDEO_OPTIONS_DISABLED,
 				Graphics_ProjectedTexturesDropDown = VIDEO_OPTIONS_DISABLED,
+				Graphics_SSAODropDown = VIDEO_OPTIONS_DISABLED,
 			},
 		},
 		[2] = {
@@ -28,12 +29,13 @@ VideoData["Graphics_Quality"]={
 				Graphics_ParticleDensityDropDown = VIDEO_OPTIONS_FAIR,
 				Graphics_EnvironmentalDetailDropDown = VIDEO_OPTIONS_FAIR,
 				Graphics_GroundClutterDropDown = VIDEO_OPTIONS_FAIR,
-				Graphics_ShadowsDropDown = VIDEO_OPTIONS_FAIR,
+				Graphics_ShadowsDropDown = VIDEO_OPTIONS_LOW,
 				Graphics_TextureResolutionDropDown = VIDEO_OPTIONS_FAIR,
 				Graphics_FilteringDropDown = VIDEO_OPTIONS_TRILINEAR,
 				Graphics_LiquidDetailDropDown = VIDEO_OPTIONS_FAIR,
 				Graphics_SunshaftsDropDown = VIDEO_OPTIONS_DISABLED,
 				Graphics_ProjectedTexturesDropDown = VIDEO_OPTIONS_DISABLED,
+				Graphics_SSAODropDown = VIDEO_OPTIONS_DISABLED,
 			},
 		},
 		[3] = {
@@ -45,11 +47,12 @@ VideoData["Graphics_Quality"]={
 				Graphics_EnvironmentalDetailDropDown = VIDEO_OPTIONS_MEDIUM,
 				Graphics_GroundClutterDropDown = VIDEO_OPTIONS_MEDIUM,
 				Graphics_ShadowsDropDown = VIDEO_OPTIONS_MEDIUM,
-				Graphics_TextureResolutionDropDown = VIDEO_OPTIONS_HIGH,
+				Graphics_TextureResolutionDropDown = VIDEO_OPTIONS_MEDIUM,
 				Graphics_FilteringDropDown = VIDEO_OPTIONS_4XANISOTROPIC,
 				Graphics_LiquidDetailDropDown = VIDEO_OPTIONS_MEDIUM,
 				Graphics_SunshaftsDropDown = VIDEO_OPTIONS_LOW,
 				Graphics_ProjectedTexturesDropDown = VIDEO_OPTIONS_ENABLED,
+				Graphics_SSAODropDown = VIDEO_OPTIONS_LOW,
 			},
 		},
 		[4] = {
@@ -66,6 +69,7 @@ VideoData["Graphics_Quality"]={
 				Graphics_LiquidDetailDropDown = VIDEO_OPTIONS_MEDIUM,
 				Graphics_SunshaftsDropDown = VIDEO_OPTIONS_HIGH,
 				Graphics_ProjectedTexturesDropDown = VIDEO_OPTIONS_ENABLED,
+				Graphics_SSAODropDown = VIDEO_OPTIONS_HIGH,
 			},
 		},
 		[5] = {
@@ -83,6 +87,7 @@ VideoData["Graphics_Quality"]={
 				Graphics_LiquidDetailDropDown = VIDEO_OPTIONS_ULTRA,
 				Graphics_SunshaftsDropDown = VIDEO_OPTIONS_HIGH,
 				Graphics_ProjectedTexturesDropDown = VIDEO_OPTIONS_ENABLED,
+				Graphics_SSAODropDown = VIDEO_OPTIONS_HIGH,
 			},
 		},
 	},
@@ -156,6 +161,7 @@ VideoData["Graphics_Quality"]={
 		end,
 	onvaluechanged = 
 		function(self, value)
+			value = floor(value + 0.5);
 			self.savevalue = value;
 			if(not self.noclick) then
 				VideoOptions_OnClick(self, value);
@@ -393,15 +399,26 @@ VideoData["Graphics_MultiSampleDropDown"]={
 			for key, cvar in pairs(self.cvarCaps) do
 				local dropDown = _G[key];
 				if ( dropDown ) then
-					local cvarValue = ControlGetCurrentCvarValue(dropDown, cvar);
+					local cvarValue, cvarIndex = ControlGetCurrentCvarValue(dropDown, cvar);
+					if ( cvarIndex ) then
+						-- this not a custom setting
+						local activeCVarValue, activeCVarIndex = ControlGetActiveCvarValue(dropDown, cvar);
+						if ( activeCVarIndex and activeCVarIndex > cvarIndex ) then
+							-- the active setting is higher, work with that
+							cvarValue = activeCVarValue;
+							cvarIndex = activeCVarIndex;
+						end
+					end
+
 					local capValue = GetMaxMultisampleFormatOnCvar(cvar, cvarValue);
 					capMaxValue = min(capMaxValue, capValue);
 					if ( capValue < self.maxValue ) then
 						local setting;
+						local dropDownValue = cvarIndex or dropDown:GetValue();
 						if ( dropDown.data ) then
-							setting = dropDown.data[dropDown:GetValue()].text;
+							setting = dropDown.data[dropDownValue].text;
 						elseif ( dropDown.table ) then
-							setting = dropDown.table[dropDown:GetValue()];
+							setting = dropDown.table[dropDownValue];
 						else
 							setting = cvarValue;
 						end
@@ -435,6 +452,7 @@ VideoData["Graphics_MultiSampleDropDown"]={
 		Graphics_LiquidDetailDropDown = "waterDetail",
 		Graphics_SunshaftsDropDown = "sunshafts",
 		Graphics_ResolutionDropDown = "gxResolution",
+		Graphics_SSAODropDown = "ssao",
 	},
 	restart = true,
 }
@@ -515,31 +533,46 @@ VideoData["Graphics_ViewDistanceDropDown"]={
 		[1] = {
 			text = VIDEO_OPTIONS_LOW,
 			cvars =	{
-				farClip = 185,
+				farClip = 200,
+				wmoLodDist = 100,
+				terrainLodDist = 200,
+				terrainTextureLod = 1,
 			},
 		},
 		[2] = {
 			text = VIDEO_OPTIONS_FAIR,
 			cvars =	{
-				farClip = 507,
+				farClip = 600,
+				wmoLodDist = 300,
+				terrainLodDist = 300,
+				terrainTextureLod = 1,
 			},
 		},
 		[3] = {
 			text = VIDEO_OPTIONS_MEDIUM,
 			cvars =	{
-				farClip = 727,
+				farClip = 800,
+				wmoLodDist = 400,
+				terrainLodDist = 450,
+				terrainTextureLod = 1,
 			},
 		},
 		[4] = {
 			text = VIDEO_OPTIONS_HIGH,
 			cvars =	{
-				farClip = 1057,
+				farClip = 1000,
+				wmoLodDist = 500,
+				terrainLodDist = 500,
+				terrainTextureLod = 0,
 			},
 		},
 		[5] = {
 			text = VIDEO_OPTIONS_ULTRA,
 			cvars =	{
-				farClip = 1250,
+				farClip = 1300,
+				wmoLodDist = 650,
+				terrainLodDist = 650,
+				terrainTextureLod = 0,
 			},
 		},
 	},
@@ -579,7 +612,7 @@ VideoData["Graphics_GroundClutterDropDown"]={
 			text = VIDEO_OPTIONS_HIGH,
 			cvars =	{
 				groundEffectDist = 200,
-				groundEffectDensity = 96,
+				groundEffectDensity = 80,
 			},
 		},
 		[5] = {
@@ -685,6 +718,40 @@ VideoData["Graphics_ParticleDensityDropDown"]={
 }
 
 -------------------------------------------------------------------------------------------------------
+VideoData["Graphics_SSAODropDown"]={
+	name = SSAO_LABEL;
+	description = OPTION_TOOLTIP_SSAO,
+
+	data = {
+		[1] = {
+			text = VIDEO_OPTIONS_DISABLED,
+			cvars =	{
+				ssao = 0,
+			},
+		},
+		[2] = {
+			text = VIDEO_OPTIONS_LOW,
+			cvars =	{
+				ssao = 2,
+			},
+		},
+		[3] = {
+			text = VIDEO_OPTIONS_HIGH,
+			cvars =	{
+				ssao = 1,
+			},
+		},
+	},
+	dependent = {
+		"Graphics_Quality",
+	},
+	capTargets = {
+		"Graphics_MultiSampleDropDown",
+	},
+	multisampleDependent = true;
+}
+
+-------------------------------------------------------------------------------------------------------
 VideoData["Graphics_ShadowsDropDown"]={
 	name = SHADOW_QUALITY;
 	description = OPTION_TOOLTIP_SHADOW_QUALITY,
@@ -744,36 +811,36 @@ VideoData["Graphics_TextureResolutionDropDown"]={
 		[1] = {
 			text = VIDEO_OPTIONS_LOW,
 			cvars =	{
-				baseMip = 1,
 				terrainMipLevel = 1,
-				componentTextureLevel = 8,
+				componentTextureLevel = 1,
+				worldBaseMip = 2,
 			},
 			tooltip = VIDEO_OPTIONS_TEXTURE_DETAIL_LOW,
 		},
 		[2] = {
 			text = VIDEO_OPTIONS_FAIR,
 			cvars =	{
-				baseMip = 0,
 				terrainMipLevel = 1,
-				componentTextureLevel = 8,
+				componentTextureLevel = 1,
+				worldBaseMip = 1,
 			},
 			tooltip = VIDEO_OPTIONS_TEXTURE_DETAIL_FAIR,
 		},
 		[3] = {
 			text = VIDEO_OPTIONS_MEDIUM,
 			cvars =	{
-				baseMip = 0,
 				terrainMipLevel = 0,
-				componentTextureLevel = 8,
+				componentTextureLevel = 0,
+				worldBaseMip = 1,
 			},
-			tooltip = VIDEO_OPTIONS_TEXTURE_DETAIL_MEDIUM,
+			tooltip = VIDEO_OPTIONS_TEXTURE_DETAIL_HIGH,
 		},
 		[4] = {
 			text = VIDEO_OPTIONS_HIGH,
 			cvars =	{
-				baseMip = 0,
 				terrainMipLevel = 0,
-				componentTextureLevel = 9,
+				componentTextureLevel = 0,
+				worldBaseMip = 0,
 			},
 			tooltip = VIDEO_OPTIONS_TEXTURE_DETAIL_HIGH,
 		},
@@ -900,7 +967,8 @@ VideoData["Graphics_LiquidDetailDropDown"]={
 	},
 	capTargets = {
 		"Graphics_MultiSampleDropDown",
-	}
+	},
+	multisampleDependent = true;
 }
 
 -------------------------------------------------------------------------------------------------------
@@ -936,7 +1004,8 @@ VideoData["Graphics_SunshaftsDropDown"]={
 	},
 	capTargets = {
 		"Graphics_MultiSampleDropDown",
-	}
+	},
+	multisampleDependent = true;
 }
 
 -------------------------------------------------------------------------------------------------------
@@ -1063,7 +1132,7 @@ VideoData["Advanced_GammaSlider"]={
 		function(self)
 			local parent = (self:GetParent()):GetName();
 			local checkbox = _G[parent .. "DesktopGamma"];
-			if(Graphics_DisplayModeDropDown:windowedmode()) then
+			if((IsMacClient() and not Graphics_DisplayModeDropDown:fullscreenmode()) or (not IsMacClient() and Graphics_DisplayModeDropDown:windowedmode())) then
 				self:Hide();
 				checkbox:Hide();
 			else

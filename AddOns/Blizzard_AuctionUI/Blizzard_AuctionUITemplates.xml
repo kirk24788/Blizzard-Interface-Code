@@ -149,18 +149,6 @@
 						</Anchor>
 					</Anchors>
 				</FontString>
-				<FontString name="$parentHighBidder" inherits="GameFontHighlightSmall">
-					<Size>
-						<AbsDimension x="78" y="32"/>
-					</Size>
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset>
-								<AbsDimension x="345" y="0"/>
-							</Offset>
-						</Anchor>
-					</Anchors>
-				</FontString>
 				<Texture name="$parentLeft" file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
 						<AbsDimension x="10" y="32"/>
@@ -254,12 +242,16 @@
 						else
 							self:GetParent():UnlockHighlight();
 						end
-						GameTooltip:Hide();
+						GameTooltip_Hide();
 						ResetCursor();
 					</OnLeave>
 					<OnClick>
 						if ( IsModifiedClick() ) then
-							HandleModifiedItemClick(GetAuctionItemLink("list", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame)));
+							if ( not HandleModifiedItemClick(GetAuctionItemLink("list", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame))) ) then
+								if ( IsModifiedClick("DRESSUP") ) then
+									DressUpBattlePet(GetAuctionItemBattlePetInfo("list", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame)));
+								end
+							end
 						else
 							BrowseButton_OnClick(self:GetParent());
 						end
@@ -323,6 +315,26 @@
 						end
 						GameTooltip:Hide();
 					</OnLeave>
+				</Scripts>
+			</Frame>
+			<Frame name="$parentHighBidder">
+				<Size x="78" y="32"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="345" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentName" parentKey="Name" inherits="GameFontHighlightSmall" setAllPoints="true"/>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						if (self.fullName) then
+							GameTooltip:SetOwner(self);
+							GameTooltip:SetText(self.fullName);
+						end
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
 				</Scripts>
 			</Frame>
 			<Frame name="$parentMoneyFrame" inherits="SmallMoneyFrameTemplate">
@@ -404,7 +416,11 @@
 		<Scripts>
 			<OnClick>
 				if ( IsModifiedClick() ) then
-					HandleModifiedItemClick(GetAuctionItemLink("list", self:GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame)));
+					if ( not HandleModifiedItemClick(GetAuctionItemLink("list", self:GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame))) ) then
+						if ( IsModifiedClick("DRESSUP") ) then
+							DressUpBattlePet(GetAuctionItemBattlePetInfo("list", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame)));
+						end
+					end
 				else
 					BrowseButton_OnClick(self);
 				end
@@ -559,12 +575,16 @@
 						else
 							self:GetParent():UnlockHighlight();
 						end
-						GameTooltip:Hide();
+						GameTooltip_Hide();
 						ResetCursor();
 					</OnLeave>
 					<OnClick>
 						if ( IsModifiedClick() ) then
-							HandleModifiedItemClick(GetAuctionItemLink("bidder", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BidScrollFrame)));
+							if ( not HandleModifiedItemClick(GetAuctionItemLink("bidder", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BidScrollFrame))) ) then
+								if ( IsModifiedClick("DRESSUP") ) then
+									DressUpBattlePet(GetAuctionItemBattlePetInfo("bidder", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame)));
+								end
+							end
 						else
 							BidButton_OnClick(self:GetParent());
 						end
@@ -664,7 +684,11 @@
 		<Scripts>
 			<OnClick>
 				if ( IsModifiedClick() ) then
-					HandleModifiedItemClick(GetAuctionItemLink("bidder", self:GetID() + FauxScrollFrame_GetOffset(BidScrollFrame)));
+					if ( not HandleModifiedItemClick(GetAuctionItemLink("bidder", self:GetID() + FauxScrollFrame_GetOffset(BidScrollFrame))) ) then
+						if ( IsModifiedClick("DRESSUP") ) then
+							DressUpBattlePet(GetAuctionItemBattlePetInfo("bidder", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame)));
+						end
+					end
 				else
 					BidButton_OnClick(self);
 				end
@@ -701,18 +725,6 @@
 							</Offset>
 						</Anchor>
 					</Anchors>
-				</FontString>
-				<FontString name="$parentHighBidder" inherits="GameFontHighlightSmall">
-					<Size>
-						<AbsDimension x="104" y="28"/>
-					</Size>
-					<Anchors>
-						<Anchor point="TOPLEFT">
-							<Offset>
-								<AbsDimension x="279" y="0"/>
-							</Offset>
-						</Anchor>
-					</Anchors>					
 				</FontString>
 				<Texture name="$parentLeft" file="Interface\AuctionFrame\UI-AuctionItemNameFrame">
 					<Size>
@@ -807,12 +819,16 @@
 						else
 							self:GetParent():UnlockHighlight();
 						end
-						GameTooltip:Hide();
+						GameTooltip_Hide();
 						ResetCursor();
 					</OnLeave>
 					<OnClick>
 						if ( IsModifiedClick() ) then
-							HandleModifiedItemClick(GetAuctionItemLink("owner", self:GetParent():GetID() + FauxScrollFrame_GetOffset(AuctionsScrollFrame)));
+							if ( not HandleModifiedItemClick(GetAuctionItemLink("owner", self:GetParent():GetID() + FauxScrollFrame_GetOffset(AuctionsScrollFrame))) ) then
+								if ( IsModifiedClick("DRESSUP") ) then
+									DressUpBattlePet(GetAuctionItemBattlePetInfo("owner", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame)));
+								end
+							end
 						else
 							AuctionsButton_OnClick(self:GetParent());
 						end
@@ -876,6 +892,26 @@
 						end
 						GameTooltip:Hide();
 					</OnLeave>
+				</Scripts>
+			</Frame>
+			<Frame name="$parentHighBidder">
+				<Size x="104" y="28"/>
+				<Anchors>
+					<Anchor point="TOPLEFT" x="279" y="0"/>
+				</Anchors>
+				<Layers>
+					<Layer level="BACKGROUND">
+						<FontString name="$parentName" parentKey="Name" inherits="GameFontHighlightSmall" setAllPoints="true"/>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnEnter>
+						if (self.fullName) then
+							GameTooltip:SetOwner(self);
+							GameTooltip:SetText(self.fullName);
+						end
+					</OnEnter>
+					<OnLeave function="GameTooltip_Hide"/>
 				</Scripts>
 			</Frame>
 			<Frame name="$parentMoneyFrame" inherits="SmallMoneyFrameTemplate">
@@ -950,7 +986,11 @@
 		<Scripts>
 			<OnClick>
 				if ( IsModifiedClick() ) then
-					HandleModifiedItemClick(GetAuctionItemLink("owner", self:GetID() + FauxScrollFrame_GetOffset(AuctionsScrollFrame)));
+					if ( not HandleModifiedItemClick(GetAuctionItemLink("owner", self:GetID() + FauxScrollFrame_GetOffset(AuctionsScrollFrame))) ) then
+						if ( IsModifiedClick("DRESSUP") ) then
+							DressUpBattlePet(GetAuctionItemBattlePetInfo("owner", self:GetParent():GetID() + FauxScrollFrame_GetOffset(BrowseScrollFrame)));
+						end
+					end
 				else
 					AuctionsButton_OnClick(self);
 				end

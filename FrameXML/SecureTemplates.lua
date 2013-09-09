@@ -191,6 +191,55 @@ function SecureButton_GetEffectiveButton(self)
     return "LeftButton";
 end
 
+-- Open a dropdown menu without tainting it in the process
+local secureDropdown;
+local InitializeSecureMenu = function(self)
+	local unit = self.unit;
+	if( not unit ) then return end
+
+	local unitType = string.match(unit, "^([a-z]+)[0-9]+$") or unit;
+
+	-- Mimic the default UI and prefer the relevant units menu when possible
+	local menu;
+	if( unitType == "raid" ) then
+		menu = "RAID";
+	elseif( unitType == "party" ) then
+		menu = "PARTY";
+	elseif( unitType == "boss" ) then
+		menu = "BOSS";
+	elseif( unitType == "focus" ) then
+		menu = "FOCUS";
+	elseif( unitType == "arenapet" or unitType == "arena" ) then
+		menu = "ARENAENEMY";
+	-- Then try and detect the unit type and show the most relevant menu we can find
+	elseif( UnitIsUnit(unit, "player") ) then
+		menu = "SELF";
+	elseif( UnitIsUnit(unit, "vehicle") ) then
+		menu = "VEHICLE";
+	elseif( UnitIsUnit(unit, "pet") ) then
+		menu = "PET";
+	elseif( UnitIsOtherPlayersBattlePet(unit) ) then
+		menu = "OTHERBATTLEPET";
+	elseif( UnitIsOtherPlayersPet(unit) ) then
+		menu = "OTHERPET";
+	-- Last ditch checks 
+	elseif( UnitIsPlayer(unit) ) then
+		if( UnitInRaid(unit) ) then
+			menu = "RAID_PLAYER";
+		elseif( UnitInParty(unit) ) then
+			menu = "PARTY";
+		else
+			menu = "PLAYER";
+		end
+	elseif( UnitIsUnit(unit, "target") ) then
+		menu = "TARGET";
+	end
+
+	if( menu ) then
+		UnitPopup_ShowMenu(self, menu, unit);
+	end
+end
+
 --
 -- SecureActionButton
 --
@@ -237,6 +286,30 @@ local forceinsecure = forceinsecure;
 
 -- Table of supported action functions
 local SECURE_ACTIONS = {};
+
+
+SECURE_ACTIONS.togglemenu = function(self, unit, button)
+	-- Load the dropdown
+	if( not secureDropdown ) then
+		secureDropdown = CreateFrame("Frame", "SecureTemplatesDropdown", nil, "UIDropDownMenuTemplate");
+		secureDropdown:SetID(1);
+
+		table.insert(UnitPopupFrames, secureDropdown:GetName());
+		UIDropDownMenu_Initialize(secureDropdown, InitializeSecureMenu, "MENU");
+	end
+
+	-- Since we use one dropdown menu for all secure menu actions, if we open a menu on A then click B
+	-- it will close the menu rather than closing A and opening it on B.
+	-- This fixes that so it opens it on B while still preserving toggling to close.
+	if( secureDropdown.openedFor and secureDropdown.openedFor ~= self ) then
+		CloseDropDownMenus();
+	end
+
+	secureDropdown.unit = string.lower(unit);
+	secureDropdown.openedFor = self;
+
+	ToggleDropDownMenu(1, nil, secureDropdown, "cursor");
+end
 
 SECURE_ACTIONS.actionbar =
     function (self, unit, button)
@@ -315,22 +388,22 @@ SECURE_ACTIONS.spell =
 
 -- Allow friendly names for glyph slots
 local GLYPH_SLOTS = {
-    minor1 = GLYPH_ID_MINOR_1;
-    minor2 = GLYPH_ID_MINOR_2;
-    minor3 = GLYPH_ID_MINOR_3;
+	minor1 = GLYPH_ID_MINOR_1;
+	minor2 = GLYPH_ID_MINOR_2;
+	minor3 = GLYPH_ID_MINOR_3;
 
-    major1 = GLYPH_ID_MAJOR_1;
-    major2 = GLYPH_ID_MAJOR_2;
-    major3 = GLYPH_ID_MAJOR_3;
+	major1 = GLYPH_ID_MAJOR_1;
+	major2 = GLYPH_ID_MAJOR_2;
+	major3 = GLYPH_ID_MAJOR_3;
 
-    prime1 = GLYPH_ID_PRIME_1;
-    prime2 = GLYPH_ID_PRIME_2;
-    prime3 = GLYPH_ID_PRIME_3;
+--	prime1 = GLYPH_ID_PRIME_1;
+--	prime2 = GLYPH_ID_PRIME_2;
+--	prime3 = GLYPH_ID_PRIME_3;
 };
 
 SECURE_ACTIONS.glyph =
     function (self, unit, button)
-        local spell = SecureButton_GetModifiedAttribute(self, "glyph", button);
+        local glyph = SecureButton_GetModifiedAttribute(self, "glyph", button);
         local slot = SecureButton_GetModifiedAttribute(self, "slot", button);
         local glyphID = tonumber(glyph);
         slot = (slot and GLYPH_SLOTS[slot]) or tonumber(slot);
@@ -384,7 +457,6 @@ SECURE_ACTIONS.macro =
 local CANCELABLE_ITEMS = {
     [GetInventorySlotInfo("MainHandSlot")] = 1, -- main hand slot
     [GetInventorySlotInfo("SecondaryHandSlot")] = 2, -- off-hand slot
-	[GetInventorySlotInfo("RangedSlot")] = 3 -- ranged slot
 };
 
 SECURE_ACTIONS.cancelaura =
@@ -467,7 +539,7 @@ SECURE_ACTIONS.click =
     function (self, unit, button)
         local delegate =
             SecureButton_GetModifiedAttribute(self, "clickbutton", button);
-        if ( delegate ) then
+        if ( delegate and not delegate:IsForbidden() ) then
             delegate:Click(button);
         end
     end;
@@ -592,7 +664,7 @@ end
 
 function SecureUnitButton_OnClick(self, button)
     local type = SecureButton_GetModifiedAttribute(self, "type", button);
-    if ( type == "menu" ) then
+    if ( type == "menu" or type == "togglemenu" ) then
         if ( SpellIsTargeting() ) then
             SpellStopTargeting();
             return;

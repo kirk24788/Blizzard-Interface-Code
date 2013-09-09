@@ -22,7 +22,7 @@
 			</Layer>
 		</Layers>
 		<Frames>
-			<Cooldown name="$parentCooldown" parentKey="cooldown" inherits="CooldownFrameTemplate" reverse="true" drawEdge="true" useParentLevel="true" hidden="true">
+			<Cooldown name="$parentCooldown" parentKey="cooldown" inherits="CooldownFrameTemplate" reverse="true" hidden="true">
 				<Anchors>
 					<Anchor point="CENTER">
 						<Offset>
@@ -63,12 +63,20 @@
 			</OnLoad>
 			<OnUpdate>
 				if ( GameTooltip:IsOwned(self) ) then
-					GameTooltip:SetUnitDebuff(self:GetParent().displayedUnit, self:GetID(), self.filter);
+					if ( self.isBossBuff ) then
+						GameTooltip:SetUnitBuff(self:GetParent().displayedUnit, self:GetID(), self.filter);
+					else
+						GameTooltip:SetUnitDebuff(self:GetParent().displayedUnit, self:GetID(), self.filter);
+					end
 				end
 			</OnUpdate>
 			<OnEnter>
 				GameTooltip:SetOwner(self, "ANCHOR_RIGHT", 0, 0);
-				GameTooltip:SetUnitDebuff(self:GetParent().displayedUnit, self:GetID(), self.filter);
+					if ( self.isBossBuff ) then
+						GameTooltip:SetUnitBuff(self:GetParent().displayedUnit, self:GetID(), self.filter);
+					else
+						GameTooltip:SetUnitDebuff(self:GetParent().displayedUnit, self:GetID(), self.filter);
+					end
 			</OnEnter>
 			<OnLeave>
 				GameTooltip:Hide();
@@ -136,6 +144,14 @@
 			<Layer level="BACKGROUND">
 				<Texture name="$parentBackground" parentKey="background" setAllPoints="true" forceAlpha="true"/>
 			</Layer>
+			<Layer level="BORDER" textureSubLevel="5">
+				<Texture name="$parentMyHealPrediction" parentKey="myHealPrediction"/>
+				<Texture name="$parentOtherHealPrediction" parentKey="otherHealPrediction"/>
+				<Texture name="$parentTotalAbsorb" parentKey="totalAbsorb"/>
+			</Layer>
+			<Layer level="BORDER" textureSubLevel="6">
+				<Texture name="$parentTotalAbsorbOverlay" parentKey="totalAbsorbOverlay"/>
+			</Layer>
 			<Layer level="BORDER">
 				<Texture name="$parentHorizDivider" parentKey="horizDivider" horizTile="true" forceAlpha="true"/>
 				<Texture name="$parentHorizTopBorder" parentKey="horizTopBorder" horizTile="true" forceAlpha="true"/>
@@ -149,10 +165,20 @@
 				<Texture name="$parentRoleIcon" hidden="true" parentKey="roleIcon"/>
 				<Texture name="$parentAggroHighlight" parentKey="aggroHighlight"/>
 			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="1">
+				<Texture name="$parentMyHealAbsorb" parentKey="myHealAbsorb"/>
+				<Texture name="$parentMyHealAbsorbLeftShadow" parentKey="myHealAbsorbLeftShadow" file="Interface\RaidFrame\Absorb-Edge"/>
+				<Texture name="$parentMyHealAbsorbRightShadow" parentKey="myHealAbsorbRightShadow" file="Interface\RaidFrame\Absorb-Edge">
+					<TexCoords left="1" right="0" top="0" bottom="1"/>
+				</Texture>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="2">
+				<Texture name="$parentOverAbsorbGlow" parentKey="overAbsorbGlow"/>
+				<Texture name="$parentOverHealAbsorbGlow" parentKey="overHealAbsorbGlow"/>
+			</Layer>
 			<Layer level="OVERLAY">
 				<Texture name="$parentSelectionHighlight" parentKey="selectionHighlight" forceAlpha="true"/>
 				<Texture name="$parentReadyCheckIcon" parentKey="readyCheckIcon" forceAlpha="true"/>
-				<Texture name="$parentIncomingResurrectIcon" parentKey="incomingResurrectIcon" hidden="true" forceAlpha="true"/>
 			</Layer>
 		</Layers>
 		<Frames>
@@ -170,8 +196,6 @@
 					</Layer>
 				</Layers>
 			</StatusBar>
-			<StatusBar name="$parentMyHealPredictionBar" parentKey="myHealPredictionBar" useParentLevel="true"/>
-			<StatusBar name="$parentOtherHealPredictionBar" parentKey="otherHealPredictionBar" useParentLevel="true"/>
 			<Button name="$parentBuff1" inherits="CompactBuffTemplate"/>
 			<Button name="$parentBuff2" inherits="CompactBuffTemplate"/>
 			<Button name="$parentBuff3" inherits="CompactBuffTemplate"/>
@@ -181,6 +205,37 @@
 			<Button name="$parentDispelDebuff1" inherits="CompactDispelDebuffTemplate"/>
 			<Button name="$parentDispelDebuff2" inherits="CompactDispelDebuffTemplate"/>
 			<Button name="$parentDispelDebuff3" inherits="CompactDispelDebuffTemplate"/>
+			<Button name="$parentCenterStatusIcon" parentKey="centerStatusIcon">
+				<Layers>
+					<Layer level="ARTWORK">
+						<Texture setAllPoints="true" parentKey="texture"/>
+					</Layer>
+					<Layer level="BORDER">
+						<Texture setAllPoints="true" parentKey="border"/>
+					</Layer>
+				</Layers>
+				<Scripts>
+					<OnClick>
+						self:GetParent():GetScript("OnClick")(self:GetParent(), button);
+					</OnClick>
+					<OnEnter>
+						if ( self.tooltip ) then
+							GameTooltip:SetOwner(self, "ANCHOR_RIGHT");
+							GameTooltip:SetText(self.tooltip, nil, nil, nil, nil, true);
+							GameTooltip:Show();
+						else
+							self:GetParent():GetScript("OnEnter")(self:GetParent(), motion);
+						end
+					</OnEnter>
+					<OnLeave>
+						if ( self.tooltip ) then
+							GameTooltip:Hide();
+						else
+							self:GetParent():GetScript("OnLeave")(self:GetParent(), motion);
+						end
+					</OnLeave>
+				</Scripts>
+			</Button>
 			<Frame name="$parentDropDown" inherits="UIDropDownMenuTemplate" parentKey="dropDown" hidden="true">
 				<Size>
 					<AbsDimension x="10" y="10"/>

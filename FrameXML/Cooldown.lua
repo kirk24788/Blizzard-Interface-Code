@@ -1,9 +1,8 @@
 
-function CooldownFrame_SetTimer(self, start, duration, enable)
-	if ( start and start > 0 and duration > 0 and enable > 0) then
-		self:SetCooldown(start, duration);
-		self:Show();
+function CooldownFrame_SetTimer(self, start, duration, enable, charges, maxCharges)
+	if(enable and enable ~= 0) then
+		self:SetCooldown(start, duration, charges, maxCharges);
 	else
-		self:Hide();
+		self:SetCooldown(0, 0, charges, maxCharges);
 	end
 end

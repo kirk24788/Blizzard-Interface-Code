@@ -14,7 +14,7 @@
 
 -- Version
 -- Constant -- Incrementing this number will erase saved filter settings!!
-COMBATLOG_FILTER_VERSION = 4.1;
+COMBATLOG_FILTER_VERSION = 4.3;
 -- Saved Variable
 Blizzard_CombatLog_Filter_Version = 0;
 
@@ -68,7 +68,7 @@ COMBATLOG_DEFAULT_COLORS = {
 };
 COMBATLOG_DEFAULT_SETTINGS = {
 	-- Settings
-	fullText = true;
+	fullText = false;
 	textMode = TEXT_MODE_A;
 	timestamp = false;
 	timestampFormat = TEXT_MODE_A_TIMESTAMP;
@@ -102,8 +102,8 @@ COMBATLOG_DEFAULT_SETTINGS = {
 	showHistory = true;
 	lineColorPriority = 1; -- 1 = source->dest->event, 2 = dest->source->event, 3 = event->source->dest
 	unitIcons = true;
-	hideBuffs = false;
-	hideDebuffs = false;
+	hideBuffs = true;
+	hideDebuffs = true;
 	--unitTokens = true;
 };
 
@@ -337,6 +337,7 @@ local SPELL_POWER_SOUL_SHARDS = SPELL_POWER_SOUL_SHARDS;
 local SPELL_POWER_ECLIPSE = SPELL_POWER_ECLIPSE;
 local SPELL_POWER_HOLY_POWER = SPELL_POWER_HOLY_POWER;
 local SPELL_POWER_ALTERNATE_POWER = SPELL_POWER_ALTERNATE_POWER;
+local SPELL_POWER_BURNING_EMBERS = SPELL_POWER_BURNING_EMBERS;
 local SCHOOL_MASK_NONE = SCHOOL_MASK_NONE
 local SCHOOL_MASK_PHYSICAL = SCHOOL_MASK_PHYSICAL
 local SCHOOL_MASK_HOLY = SCHOOL_MASK_HOLY
@@ -370,8 +371,6 @@ local CombatLogQuickButtonFrame, CombatLogQuickButtonFrameProgressBar, CombatLog
 _G.CombatLogQuickButtonFrame = CreateFrame("Frame", "CombatLogQuickButtonFrame", UIParent)
 
 local Blizzard_CombatLog_Update_QuickButtons
-local Blizzard_CombatLog_Filters
-local Blizzard_CombatLog_CurrentSettings
 local Blizzard_CombatLog_PreviousSettings
 
 
@@ -386,15 +385,15 @@ Blizzard_CombatLog_Filter_Defaults = {
 	filters = {
 		[1] = {
 			-- Descriptive Information
-			name = QUICKBUTTON_NAME_SELF;
+			name = QUICKBUTTON_NAME_MY_ACTIONS;
 			hasQuickButton = true;
-			quickButtonName = QUICKBUTTON_NAME_SELF;
+			quickButtonName = QUICKBUTTON_NAME_MY_ACTIONS;
 			quickButtonDisplay = {
 				solo = true;
 				party = true;
 				raid = true;
 			};
-			tooltip = QUICKBUTTON_NAME_SELF_TOOLTIP;
+			tooltip = QUICKBUTTON_NAME_MY_ACTIONS_TOOLTIP;
 
 			-- Default Color and Formatting Options
 			settings = CopyTable(COMBATLOG_DEFAULT_SETTINGS);
@@ -406,54 +405,53 @@ Blizzard_CombatLog_Filter_Defaults = {
 			filters = {
 				[1] = {
 					eventList = {
-					      ["ENVIRONMENTAL_DAMAGE"] = true,
+					      ["ENVIRONMENTAL_DAMAGE"] = false,
 					      ["SWING_DAMAGE"] = true,
-					      ["SWING_MISSED"] = true,
+					      ["SWING_MISSED"] = false,
 					      ["RANGE_DAMAGE"] = true,
-					      ["RANGE_MISSED"] = true,
+					      ["RANGE_MISSED"] = false,
 					      --["SPELL_CAST_START"] = true,
 					      --["SPELL_CAST_SUCCESS"] = true,
 					      --["SPELL_CAST_FAILED"] = true,
-					      ["SPELL_MISSED"] = true,
+					      ["SPELL_MISSED"] = false,
 					      ["SPELL_DAMAGE"] = true,
 					      ["SPELL_HEAL"] = true,
-					      ["SPELL_ENERGIZE"] = true,
-					      ["SPELL_DRAIN"] = true,
-					      ["SPELL_LEECH"] = true,
-					      ["SPELL_INSTAKILL"] = true,
-					      ["SPELL_INTERRUPT"] = true,
-					      ["SPELL_EXTRA_ATTACKS"] = true,
+					      ["SPELL_ENERGIZE"] = false,
+					      ["SPELL_DRAIN"] = false,
+					      ["SPELL_LEECH"] = false,
+					      ["SPELL_INSTAKILL"] = false,
+					      ["SPELL_INTERRUPT"] = false,
+					      ["SPELL_EXTRA_ATTACKS"] = false,
 					      --["SPELL_DURABILITY_DAMAGE"] = true,
 					      --["SPELL_DURABILITY_DAMAGE_ALL"] = true,
-					      ["SPELL_AURA_APPLIED"] = true,
-					      ["SPELL_AURA_APPLIED_DOSE"] = true,
-					      ["SPELL_AURA_REMOVED"] = true,
-					      ["SPELL_AURA_REMOVED_DOSE"] = true,
-					      ["SPELL_AURA_BROKEN"] = true,
-						  ["SPELL_AURA_BROKEN_SPELL"] = true,
-						  ["SPELL_AURA_REFRESH"] = true,
-					      ["SPELL_DISPEL"] = true,
-					      ["SPELL_STOLEN"] = true,
-					      ["ENCHANT_APPLIED"] = true,
-					      ["ENCHANT_REMOVED"] = true,
-					      ["SPELL_PERIODIC_MISSED"] = true,
+					      ["SPELL_AURA_APPLIED"] = false,
+					      ["SPELL_AURA_APPLIED_DOSE"] = false,
+					      ["SPELL_AURA_REMOVED"] = false,
+					      ["SPELL_AURA_REMOVED_DOSE"] = false,
+					      ["SPELL_AURA_BROKEN"] = false,
+						  ["SPELL_AURA_BROKEN_SPELL"] = false,
+						  ["SPELL_AURA_REFRESH"] = false,
+					      ["SPELL_DISPEL"] = false,
+					      ["SPELL_STOLEN"] = false,
+					      ["ENCHANT_APPLIED"] = false,
+					      ["ENCHANT_REMOVED"] = false,
+					      ["SPELL_PERIODIC_MISSED"] = false,
 					      ["SPELL_PERIODIC_DAMAGE"] = true,
 					      ["SPELL_PERIODIC_HEAL"] = true,
-					      ["SPELL_PERIODIC_ENERGIZE"] = true,
-					      ["SPELL_PERIODIC_DRAIN"] = true,
-					      ["SPELL_PERIODIC_LEECH"] = true,
-					      ["SPELL_DISPEL_FAILED"] = true,
+					      ["SPELL_PERIODIC_ENERGIZE"] = false,
+					      ["SPELL_PERIODIC_DRAIN"] = false,
+					      ["SPELL_PERIODIC_LEECH"] = false,
+					      ["SPELL_DISPEL_FAILED"] = false,
 					      --["DAMAGE_SHIELD"] = true,
 					      --["DAMAGE_SHIELD_MISSED"] = true,
-					      --["DAMAGE_SPLIT"] = true,
+					      ["DAMAGE_SPLIT"] = true,
 					      ["PARTY_KILL"] = true,
-					      ["UNIT_DIED"] = true,
+					      ["UNIT_DIED"] = false,
 					      ["UNIT_DESTROYED"] = true,
 					      ["UNIT_DISSIPATES"] = true
 					};
 					sourceFlags = {
-						[COMBATLOG_FILTER_MINE] = true,
-						[COMBATLOG_FILTER_MY_PET] = true;
+						[COMBATLOG_FILTER_MINE] = true
 					};
 					destFlags = nil;
 				};
@@ -495,53 +493,21 @@ Blizzard_CombatLog_Filter_Defaults = {
 					      ["SPELL_DISPEL_FAILED"] = true,
 					      --["DAMAGE_SHIELD"] = true,
 					      --["DAMAGE_SHIELD_MISSED"] = true,
-					      --["DAMAGE_SPLIT"] = true,
+					      ["DAMAGE_SPLIT"] = true,
 					      ["PARTY_KILL"] = true,
 					      ["UNIT_DIED"] = true,
 					      ["UNIT_DESTROYED"] = true,
 					      ["UNIT_DISSIPATES"] = true
 					};
 					sourceFlags = nil;
-					destFlags = {
-						[COMBATLOG_FILTER_MINE] = true,
-						[COMBATLOG_FILTER_MY_PET] = true;
+					destFlags =  {
+						[COMBATLOG_FILTER_MINE] = false,
+						[COMBATLOG_FILTER_MY_PET] = false;
 					};
 				};
 			};
 		};
 		[2] = {
-			-- Descriptive Information
-			name = QUICKBUTTON_NAME_EVERYTHING;
-			hasQuickButton = true;
-			quickButtonName = QUICKBUTTON_NAME_EVERYTHING;
-			quickButtonDisplay = {
-				solo = true;
-				party = true;
-				raid = true;
-			};
-			tooltip = QUICKBUTTON_NAME_EVERYTHING_TOOLTIP;
-
-			-- Settings
-			settings = CopyTable(COMBATLOG_DEFAULT_SETTINGS);
-
-			-- Coloring
-			colors = CopyTable(COMBATLOG_DEFAULT_COLORS);
-
-			-- The actual client filters
-			filters = {
-				[1] = {
-					eventList = Blizzard_CombatLog_GenerateFullEventList();
-					sourceFlags = Blizzard_CombatLog_GenerateFullFlagList(true);
-					destFlags = nil;
-				};
-				[2] = {
-					eventList = Blizzard_CombatLog_GenerateFullEventList();
-					sourceFlags = nil;
-					destFlags = Blizzard_CombatLog_GenerateFullFlagList(true);
-				};
-			};
-		};
-		[3] = {
 			-- Descriptive Information
 			name = QUICKBUTTON_NAME_ME;
 			hasQuickButton = true;
@@ -562,7 +528,19 @@ Blizzard_CombatLog_Filter_Defaults = {
 			-- The actual client filters
 			filters = {
 				[1] = {
-					eventList = Blizzard_CombatLog_GenerateFullEventList();
+					eventList = {
+					      ["ENVIRONMENTAL_DAMAGE"] = true,
+					      ["SWING_DAMAGE"] = true,
+					      ["RANGE_DAMAGE"] = true,
+					      ["SPELL_DAMAGE"] = true,
+					      ["SPELL_HEAL"] = true,
+					      ["SPELL_PERIODIC_DAMAGE"] = true,
+					      ["SPELL_PERIODIC_HEAL"] = true,
+					      ["DAMAGE_SPLIT"] = true,
+					      ["UNIT_DIED"] = true,
+					      ["UNIT_DESTROYED"] = true,
+					      ["UNIT_DISSIPATES"] = true
+					};
 					sourceFlags = Blizzard_CombatLog_GenerateFullFlagList(false);
 					destFlags = nil;
 				};
@@ -571,50 +549,8 @@ Blizzard_CombatLog_Filter_Defaults = {
 					sourceFlags = nil;
 					destFlags =  {
 						[COMBATLOG_FILTER_MINE] = true,
-						[COMBATLOG_FILTER_MY_PET] = true;
+						[COMBATLOG_FILTER_MY_PET] = false;
 					};
-				};
-			};
-		};
-		[4] = {
-			-- Descriptive Information
-			name = QUICKBUTTON_NAME_KILLS;
-			hasQuickButton = false;
-			quickButtonName = QUICKBUTTON_NAME_KILLS;
-			quickButtonDisplay = {
-				solo = true;
-				party = true;
-				raid = true;
-			};
-			tooltip = QUICKBUTTON_NAME_KILLS_TOOLTIP;
-
-			-- Settings
-			settings = CopyTable(COMBATLOG_DEFAULT_SETTINGS);
-
-			-- Coloring
-			colors = CopyTable(COMBATLOG_DEFAULT_COLORS);
-
-			-- The actual client filters
-			filters = {
-				[1] = {
-					eventList = {
-						["PARTY_KILL"] = true,
-						["UNIT_DIED"] = true,
-						["UNIT_DESTROYED"] = true,
-						["UNIT_DISSIPATES"] = true
-					};
-					sourceFlags = Blizzard_CombatLog_GenerateFullFlagList(true);
-					destFlags = nil;
-				};
-				[2] = {
-					eventList = {
-						["PARTY_KILL"] = true,
-						["UNIT_DIED"] = true,
-						["UNIT_DESTROYED"] = true,
-						["UNIT_DISSIPATES"] = true
-					};
-					sourceFlags = nil;
-					destFlags = Blizzard_CombatLog_GenerateFullFlagList(true);
 				};
 			};
 		};
@@ -624,8 +560,7 @@ Blizzard_CombatLog_Filter_Defaults = {
 	currentFilter = 1;
 };
 
-local Blizzard_CombatLog_Filters = Blizzard_CombatLog_Filter_Defaults;
-_G.Blizzard_CombatLog_Filters = Blizzard_CombatLog_Filters
+Blizzard_CombatLog_Filters = Blizzard_CombatLog_Filter_Defaults;
 
 -- Combat Log Filter Resetting Code
 --
@@ -642,11 +577,14 @@ function Blizzard_CombatLog_ApplyFilters(config)
 	local eventList;
 	for k,v in pairs(config.filters) do	
 		local eList
-		-- Only use the first filter's eventList
+		-- Only use the first filter's eventList because for some reason each filter that the player can see actually 
+		-- has two filters, one for source flags and one for dest flags (??), even though only the eventList for the source
+		-- flags is updated properly
 		eventList = config.filters[1].eventList;
 		if ( eventList ) then
 			for k2,v2 in pairs(eventList) do 
 				if ( v2 == true ) then
+				-- The true comparison is because check boxes whose parent is unchecked will be non-false but not "true"
 					eList = eList and (eList .. "," .. k2) or k2
 				end
 			end
@@ -1846,7 +1784,7 @@ local function CombatLog_Color_ColorArrayBySchool(school, settings)
 		return settings.colors.schoolColoring.default;
 	end
 
-	return settings.colors.schoolColoring[school] or defaultColorArray
+	return settings.colors.schoolColoring[school] or settings.colors.defaults.spell;
 end
 _G.CombatLog_Color_ColorArrayBySchool = CombatLog_Color_ColorArrayBySchool
 
@@ -1893,6 +1831,12 @@ local function CombatLog_String_PowerType(powerType, amount, alternatePowerType)
 		end
 	elseif ( powerType == SPELL_POWER_HOLY_POWER ) then
 		return HOLY_POWER;
+	elseif ( powerType == SPELL_POWER_CHI ) then
+		return CHI_POWER; -- "Chi"
+	elseif ( powerType == SPELL_POWER_BURNING_EMBERS ) then
+		return BURNING_EMBERS_POWER;
+	elseif ( powerType == SPELL_POWER_SHADOW_ORBS ) then
+		return SHADOW_ORBS_POWER;
 	elseif ( powerType == SPELL_POWER_ALTERNATE_POWER and alternatePowerType ) then
 		local costName = select(12, GetAlternatePowerInfoByID(alternatePowerType));
 		return costName;	--costName could be nil if we didn't get the alternatePowerType for some reason (e.g. target out of AOI)
@@ -1900,61 +1844,12 @@ local function CombatLog_String_PowerType(powerType, amount, alternatePowerType)
 end
 _G.CombatLog_String_PowerType = CombatLog_String_PowerType
 
-local SCHOOL_STRINGS = {
-	STRING_SCHOOL_PHYSICAL,
-	STRING_SCHOOL_HOLY,
-	STRING_SCHOOL_FIRE,
-	STRING_SCHOOL_NATURE,
-	STRING_SCHOOL_FROST,
-	STRING_SCHOOL_SHADOW,
-	STRING_SCHOOL_ARCANE
-}
-
-local SchoolStringTable = {
-	-- Single Schools
-	[SCHOOL_MASK_PHYSICAL]						= STRING_SCHOOL_PHYSICAL,
-	[SCHOOL_MASK_HOLY]							= STRING_SCHOOL_HOLY,
-	[SCHOOL_MASK_FIRE]							= STRING_SCHOOL_FIRE,
-	[SCHOOL_MASK_NATURE]						= STRING_SCHOOL_NATURE,
-	[SCHOOL_MASK_FROST]							= STRING_SCHOOL_FROST,
-	[SCHOOL_MASK_SHADOW]						= STRING_SCHOOL_SHADOW,
-	[SCHOOL_MASK_ARCANE]						= STRING_SCHOOL_ARCANE,
-	-- Physical and a Magical
-	[SCHOOL_MASK_PHYSICAL + SCHOOL_MASK_FIRE]	= STRING_SCHOOL_FLAMESTRIKE,
-	[SCHOOL_MASK_PHYSICAL + SCHOOL_MASK_FROST]	= STRING_SCHOOL_FROSTSTRIKE,
-	[SCHOOL_MASK_PHYSICAL + SCHOOL_MASK_ARCANE]	= STRING_SCHOOL_SPELLSTRIKE,
-	[SCHOOL_MASK_PHYSICAL + SCHOOL_MASK_NATURE]	= STRING_SCHOOL_STORMSTRIKE,
-	[SCHOOL_MASK_PHYSICAL + SCHOOL_MASK_SHADOW]	= STRING_SCHOOL_SHADOWSTRIKE,
-	[SCHOOL_MASK_PHYSICAL + SCHOOL_MASK_HOLY]	= STRING_SCHOOL_HOLYSTRIKE,
-	-- Two Magical Schools
-	[SCHOOL_MASK_FIRE + SCHOOL_MASK_FROST]		= STRING_SCHOOL_FROSTFIRE,
-	[SCHOOL_MASK_FIRE + SCHOOL_MASK_ARCANE]		= STRING_SCHOOL_SPELLFIRE,
-	[SCHOOL_MASK_FIRE + SCHOOL_MASK_NATURE]		= STRING_SCHOOL_FIRESTORM,
-	[SCHOOL_MASK_FIRE + SCHOOL_MASK_SHADOW]		= STRING_SCHOOL_SHADOWFLAME,
-	[SCHOOL_MASK_FIRE + SCHOOL_MASK_HOLY]		= STRING_SCHOOL_HOLYFIRE,
-	[SCHOOL_MASK_FROST + SCHOOL_MASK_ARCANE]	= STRING_SCHOOL_SPELLFROST,
-	[SCHOOL_MASK_FROST + SCHOOL_MASK_NATURE]	= STRING_SCHOOL_FROSTSTORM,
-	[SCHOOL_MASK_FROST + SCHOOL_MASK_SHADOW]	= STRING_SCHOOL_SHADOWFROST,
-	[SCHOOL_MASK_FROST + SCHOOL_MASK_HOLY]		= STRING_SCHOOL_HOLYFROST,
-	[SCHOOL_MASK_ARCANE + SCHOOL_MASK_NATURE]	= STRING_SCHOOL_SPELLSTORM,
-	[SCHOOL_MASK_ARCANE + SCHOOL_MASK_SHADOW]	= STRING_SCHOOL_SPELLSHADOW,
-	[SCHOOL_MASK_ARCANE + SCHOOL_MASK_HOLY]		= STRING_SCHOOL_DIVINE,
-	[SCHOOL_MASK_NATURE + SCHOOL_MASK_SHADOW]	= STRING_SCHOOL_SHADOWSTORM,
-	[SCHOOL_MASK_NATURE + SCHOOL_MASK_HOLY]		= STRING_SCHOOL_HOLYSTORM,
-	[SCHOOL_MASK_SHADOW + SCHOOL_MASK_HOLY]		= STRING_SCHOOL_SHADOWLIGHT,
-	-- Three or more schools
-	[SCHOOL_MASK_FIRE + SCHOOL_MASK_FROST + SCHOOL_MASK_NATURE]																						= STRING_SCHOOL_ELEMENTAL,
-	[SCHOOL_MASK_FIRE + SCHOOL_MASK_FROST + SCHOOL_MASK_ARCANE + SCHOOL_MASK_NATURE + SCHOOL_MASK_SHADOW]											= STRING_SCHOOL_CHROMATIC,
-	[SCHOOL_MASK_FIRE + SCHOOL_MASK_FROST + SCHOOL_MASK_ARCANE + SCHOOL_MASK_NATURE + SCHOOL_MASK_SHADOW + SCHOOL_MASK_HOLY]						= STRING_SCHOOL_MAGIC,
-	[SCHOOL_MASK_PHYSICAL + SCHOOL_MASK_FIRE + SCHOOL_MASK_FROST + SCHOOL_MASK_ARCANE + SCHOOL_MASK_NATURE + SCHOOL_MASK_SHADOW + SCHOOL_MASK_HOLY]	= STRING_SCHOOL_CHAOS,
-};
-
 local function CombatLog_String_SchoolString(school)
 	if ( not school or school == SCHOOL_MASK_NONE ) then
 		return STRING_SCHOOL_UNKNOWN;
 	end
 
-	local schoolString = SchoolStringTable[school];
+	local schoolString = GetSchoolString(school);
 	return schoolString or STRING_SCHOOL_UNKNOWN
 end
 _G.CombatLog_String_SchoolString = CombatLog_String_SchoolString
@@ -2213,6 +2108,7 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 	local valueIsItem = false;
 	local schoolEnabled = true;
 	local withPoints = false;
+	local forceDestPossessive = false;
 
 	-- Get the initial string
 	local schoolString;
@@ -2252,7 +2148,10 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 	local message; -- Used for server spell messages
 	local originalEvent = event; -- Used for spell links
 	local remainingPoints;	--Used for absorbs with the correct flag set (like Power Word: Shield)
-
+	
+	--Extra data for PARTY_KILL, SPELL_INSTAKILL and UNIT_DIED
+	local unconsciousOnDeath = 0;
+	
 	-- Generic disabling stuff
 	if ( not sourceName or CombatLog_Object_IsA(sourceFlags, COMBATLOG_OBJECT_NONE) ) then
 		sourceEnabled = false;
@@ -2392,7 +2291,7 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 				
 				-- Result String
 				if ( missType == "ABSORB" ) then
-					resultStr = CombatLog_String_DamageResultString( resisted, blocked, select(5,...), critical, glancing, crushing, overhealing, textMode, spellId, overkill );
+					resultStr = CombatLog_String_DamageResultString( resisted, blocked, select(6,...), critical, glancing, crushing, overhealing, textMode, spellId, overkill );
 				else
 					resultStr = _G["ACTION_SPELL_PERIODIC_MISSED_"..missType];
 				end
@@ -2607,6 +2506,8 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 			resultEnabled = false;
 			valueEnabled = false;
 			schoolEnabled = false;
+			
+			unconsciousOnDeath = select(4, ...);
 		elseif ( event == "SPELL_DURABILITY_DAMAGE" ) then
 			-- Disable appropriate sections
 			resultEnabled = false;
@@ -2670,6 +2571,7 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 				extraSpellEnabled = true;
 				valueEnabled = true;
 			else
+				forceDestPossessive = true;
 				valueEnabled = false;
 			end
 
@@ -2800,6 +2702,8 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 		resultEnabled = false;
 		valueEnabled = false;
 		spellEnabled = false;
+		
+		unconsciousOnDeath = ...;
 	elseif ( event == "ENCHANT_APPLIED" ) then	
 		-- Get the enchant name, item id and item name
 		spellName, itemId, itemName = ...;
@@ -2832,10 +2736,13 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 		destEnabled = false;
 		spellEnabled = false;
 		valueEnabled = false;
+		
+		unconsciousOnDeath = ...;
 	elseif ( event == "ENVIRONMENTAL_DAMAGE" ) then
 		--Environemental Type, Damage standard
 		environmentalType, amount, overkill, school, resisted, blocked, absorbed, critical, glancing, crushing = ...
-
+		environmentalType = string.upper(environmentalType);
+		
 		-- Miss Event
 		spellName = _G["ACTION_ENVIRONMENTAL_DAMAGE_"..environmentalType];
 		spellSchool = school;
@@ -2924,6 +2831,44 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 	local extraSpellNameStr = extraSpellName;
 	local itemNameStr = itemName;
 	local actionEvent = "ACTION_"..event;
+	
+	--This is to get PARTY_KILL COMBAT_LOG_EVENTs on UnconsciousOnDeath units to display properly without new CombatLog events.
+	if ( event == "PARTY_KILL" ) then
+		if ( unconsciousOnDeath == 1 ) then
+			actionEvent = "ACTION_PARTY_KILL_UNCONSCIOUS";
+			
+			if ( settings.fullText ) then
+				formatString = _G["ACTION_PARTY_KILL_UNCONSCIOUS_FULL_TEXT"];
+			end
+		end	
+	end
+	
+	--This is to get SPELL_INSTAKILL COMBAT_LOG_EVENTs on UnconsciousOnDeath units to display properly without new CombatLog events.
+	if ( event == "SPELL_INSTAKILL" ) then
+		if ( unconsciousOnDeath == 1 ) then
+			actionEvent = "ACTION_SPELL_INSTAKILL_UNCONSCIOUS";
+			
+			if ( settings.fullText ) then
+				if ( not sourceEnabled ) then
+					formatString = _G["ACTION_SPELL_INSTAKILL_UNCONSCIOUS_FULL_TEXT_NO_SOURCE"];
+				else
+					formatString = _G["ACTION_SPELL_INSTAKILL_UNCONSCIOUS_FULL_TEXT"];
+				end
+			end
+		end	
+	end
+	
+	--This is to get the UNIT_DIED COMBAT_LOG_EVENTs for UnconsciousOnDeath units to display properly without new CombatLog events.
+	if ( event == "UNIT_DIED" ) then
+		if ( unconsciousOnDeath == 1 ) then
+			actionEvent = "ACTION_UNIT_BECCOMES_UNCONSCIOUS";
+			
+			if ( settings.fullText ) then
+				formatString = _G["ACTION_UNIT_BECOMES_UNCONSCIOUS_FULL_TEXT"];
+			end
+		end	
+	end
+	
 	local actionStr = _G[actionEvent];
 	local timestampStr = timestamp;
 	local powerTypeString = "";
@@ -2967,7 +2912,7 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 		end
 
 		-- Apply the possessive form to the dest if the dest has a spell
-		if ( ( extraSpellName or itemName ) and destName ) then
+		if ( ( extraSpellName or forceDestPossessive  or itemName ) and destName ) then
 			destNameStr = format(TEXT_MODE_A_STRING_POSSESSIVE, destNameStr);
 		end
 	end
@@ -3331,6 +3276,10 @@ function CombatLog_OnEvent(filterSettings, timestamp, event, hideCaster, sourceG
 		amount = "";
 	end
 
+	if ( not extraAmount) then
+		extraAmount = "";
+	end
+	
 	if ( sourceString == "" and not hideCaster ) then
 		sourceString = UNKNOWN;
 	end
@@ -3414,7 +3363,7 @@ function(self, event, ...)
 		end
 	end
 );
-COMBATLOG:RegisterEvent("COMBAT_LOG_EVENT");
+--COMBATLOG:RegisterEvent("COMBAT_LOG_EVENT");
 --COMBATLOG:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED");
 
 --[[
@@ -3547,6 +3496,9 @@ function Blizzard_CombatLog_QuickButtonFrame_OnLoad(self)
 		COMBATLOG:UnregisterEvent("COMBAT_LOG_EVENT");
 		return hide and hide(self)
 	end)	
+	if ( COMBATLOG:IsShown() ) then
+		COMBATLOG:RegisterEvent("COMBAT_LOG_EVENT");
+	end
 	
 	FCF_SetButtonSide(COMBATLOG, COMBATLOG.buttonSide, true);
 end
@@ -3749,9 +3701,9 @@ end
 
 function ShowQuickButton(filter)
 	if ( filter.hasQuickButton ) then
-		if ( GetNumRaidMembers() > 0 ) then
+		if ( IsInRaid() ) then
 			return filter.quickButtonDisplay.raid;
-		elseif ( GetNumPartyMembers() > 0 ) then
+		elseif ( IsInGroup() ) then
 			return filter.quickButtonDisplay.party;
 		else
 			return filter.quickButtonDisplay.solo;
@@ -3763,7 +3715,5 @@ end
 
 function Blizzard_CombatLog_RefreshGlobalLinks()
 	-- Have to do this because Blizzard_CombatLog_Filters is a reference to the _G.Blizzard_CombatLog_Filters
-	Blizzard_CombatLog_Filters = _G.Blizzard_CombatLog_Filters;
 	Blizzard_CombatLog_CurrentSettings = Blizzard_CombatLog_Filters.filters[Blizzard_CombatLog_Filters.currentFilter];
-	_G.Blizzard_CombatLog_CurrentSettings = Blizzard_CombatLog_CurrentSettings;
 end

@@ -180,8 +180,8 @@ function BNConversationInvite_Update()
 		local frame = _G["BNConversationInviteDialogListFriend"..i];
 		if ( index <= numBNetOnline ) then
 			local friendIndex = index;
-			local presenceID, givenName, surname = BNGetFriendInfo(friendIndex);
-			frame.name:SetFormattedText(BATTLENET_NAME_FORMAT, givenName, surname);
+			local presenceID, presenceName = BNGetFriendInfo(friendIndex);
+			frame.name:SetText(presenceName);
 			frame.id = presenceID;
 			frame:Show();
 		else
@@ -194,9 +194,15 @@ function BNConversationInvite_Update()
 				(#BNConversationInviteDialog.inviteTargets >= BNConversationInviteDialog.maxInvites and --Disable everything if we've checked the max amount
 				not frame.checkButton:GetChecked()  ) ) then	--Never disable a button that is already checked) then 
 			frame.checkButton:Disable();
+			frame.checkButton.tooltipText = nil;			
+			frame.name:SetFontObject("GameFontDisable");
+		elseif ( index <= numBNetOnline and not BNIsFriendConversationValid(index) ) then
+			frame.checkButton:Disable();
+			frame.checkButton.tooltipText = CONVERSATION_INCOMPATIBLE_CLIENT;
 			frame.name:SetFontObject("GameFontDisable");
 		else
 			frame.checkButton:Enable();
+			frame.checkButton.tooltipText = nil;			
 			frame.name:SetFontObject("GameFontHighlight");
 		end
 		

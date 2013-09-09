@@ -1,5 +1,5 @@
 local REALM_BUTTON_HEIGHT = 16;
-local MAX_REALMS_DISPLAYED = 18;
+local MAX_REALMS_DISPLAYED = 20;
 local MAX_REALM_CATEGORY_TABS = 8;
 
 function RealmList_OnLoad(self)
@@ -31,7 +31,7 @@ function RealmListUpdate()
 	RealmList_UpdateTabs(GetRealmCategories());
 
 	local numRealms = GetNumRealms(RealmList.selectedCategory);
-	local name, numCharacters, invalidRealm, currentRealm, pvp, rp, load, locked;
+	local name, numCharacters, invalidRealm, realmDown, currentRealm, pvp, rp, load, locked;
 	local realmIndex;
 	local pvpText, loadText, isFull;
 	local major, minor, revision, build, type;
@@ -105,7 +105,7 @@ function RealmListUpdate()
 					button:SetText(name);
 				end
 
-				players = _G["RealmListRealmButton"..i.."Players"];
+				local players = _G["RealmListRealmButton"..i.."Players"];
 				if ( numCharacters > 0 ) then
 					players:SetText("("..numCharacters..")");
 				else

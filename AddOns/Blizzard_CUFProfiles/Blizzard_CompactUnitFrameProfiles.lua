@@ -3,6 +3,7 @@ function CompactUnitFrameProfiles_OnLoad(self)
 	self:RegisterEvent("COMPACT_UNIT_FRAME_PROFILES_LOADED");
 	self:RegisterEvent("PLAYER_ENTERING_WORLD");
 	self:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED");
+	self:RegisterEvent("GROUP_JOINED");
 	
 	--Get this working with the InterfaceOptions panel.
 	self.name = COMPACT_UNIT_FRAME_PROFILES_LABEL;
@@ -30,6 +31,11 @@ function CompactUnitFrameProfiles_OnEvent(self, event, ...)
 		CompactUnitFrameProfiles_CheckAutoActivation();
 	elseif ( event == "ACTIVE_TALENT_GROUP_CHANGED" ) then	--Check for changing specs
 		CompactUnitFrameProfiles_CheckAutoActivation();
+	elseif ( event == "GROUP_JOINED" ) then
+		local partyCategory = ...;
+		if ( partyCategory == LE_PARTY_CATEGORY_INSTANCE ) then
+			CompactUnitFrameProfiles_CheckAutoActivation();
+		end
 	end
 end
 
@@ -285,7 +291,7 @@ function CompactUnitFrameProfiles_GetAutoActivationState()
 		end
 		profileType, enemyType = instanceType, "PvE";
 	elseif ( instanceType == "arena" ) then
-		local groupSize = max(GetRealNumPartyMembers() + 1, GetRealNumRaidMembers());
+		local groupSize = GetNumGroupMembers(LE_PARTY_CATEGORY_HOME);
 		--TODO - Get the actual arena size, not just the # in party.
 		if ( groupSize <= 2 ) then
 			numPlayers, profileType, enemyType = 2, instanceType, "PvP";
@@ -301,9 +307,8 @@ function CompactUnitFrameProfiles_GetAutoActivationState()
 			numPlayers, profileType, enemyType = countMap[maxPlayers], instanceType, "PvP";
 		end
 	else
-		local numRaidMembers = GetNumRaidMembers();
-		if ( numRaidMembers > 0 ) then
-			numPlayers, profileType, enemyType = countMap[GetNumRaidMembers()], "world", "PvE";
+		if ( IsInRaid() ) then
+			numPlayers, profileType, enemyType = countMap[GetNumGroupMembers()], "world", "PvE";
 		else
 			numPlayers, profileType, enemyType = 5, "world", "PvE";
 		end
@@ -317,7 +322,9 @@ function CompactUnitFrameProfiles_GetAutoActivationState()
 end
 
 function CompactUnitFrameProfiles_CheckAutoActivation()
-	if ( GetNumRaidMembers() == 0 and GetNumPartyMembers() == 0 ) then
+	--We only want to adjust the profile when you 1) Zone or 2) change specs. We don't want to automatically
+	--change the profile when you are in the uninstanced world.
+	if ( not IsInGroup() ) then
 		CompactUnitFrameProfiles_SetLastActivationType(nil, nil, nil, nil);
 		return;
 	end
@@ -332,7 +339,7 @@ function CompactUnitFrameProfiles_CheckAutoActivation()
 		AnimTimerFrameUpdateActiveRaidProfileGroup:Stop();
 	end
 		
-	local spec = GetActiveTalentGroup();
+	local spec = GetActiveSpecGroup();
 	local lastActivationType, lastNumPlayers, lastSpec, lastEnemyType = CompactUnitFrameProfiles_GetLastActivationType();
 	
 	if ( activationType == "world" ) then	--We don't adjust due to just the number of players in the raid.
@@ -519,6 +526,11 @@ function CompactUnitFrameProfilesCheckButton_Update(self)
 end
 
 function CompactUnitFrameProfilesCheckButton_OnClick(self, button)
+	if ( self:GetChecked() ) then
+		PlaySound("igMainMenuOptionCheckBoxOn");
+	else
+		PlaySound("igMainMenuOptionCheckBoxOff");
+	end
 	SetRaidProfileOption(CompactUnitFrameProfiles.selectedProfile, self.optionName, not not self:GetChecked());
 	CompactUnitFrameProfiles_ApplyCurrentSettings();
 	CompactUnitFrameProfiles_UpdateCurrentPanel();

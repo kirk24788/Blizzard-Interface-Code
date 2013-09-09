@@ -4,7 +4,7 @@
 	<!--IMPORTANT
 		If you change anything in this file, be sure to change the equivalent data in PlayerFrame.lua, function PlayerFrame_ToPlayerArt
 		IMPORTANT-->
-	<Button name="PlayerFrame" frameStrata="BACKGROUND" toplevel="true" movable="true" inherits="SecureUnitButtonTemplate" parent="UIParent">
+	<Button name="PlayerFrame" frameStrata="LOW" toplevel="true" movable="true" inherits="SecureUnitButtonTemplate" parent="UIParent">
 		<Size>
 			<AbsDimension x="232" y="100"/>
 		</Size>
@@ -60,6 +60,10 @@
 						</Anchor>
 					</Anchors>
 				</Texture>
+				<Texture name="$parentTotalAbsorbBar" inherits="TotalAbsorbBarTemplate"/>
+			</Layer>
+			<Layer level="ARTWORK" textureSubLevel="1">
+				<Texture name="$parentTotalAbsorbBarOverlay" inherits="TotalAbsorbBarOverlayTemplate"/>
 			</Layer>
 		</Layers>
 		<Frames>
@@ -68,6 +72,13 @@
 					<Frame setAllPoints="true">
 						<Layers>
 							<Layer level="BACKGROUND">
+								<Texture name="PlayerFrameMyHealPredictionBar" inherits="MyHealPredictionBarTemplate"/>
+								<Texture name="PlayerFrameOtherHealPredictionBar" inherits="OtherHealPredictionBarTemplate"/>
+								<Texture name="$parentHealAbsorbBar" inherits="HealAbsorbBarTemplate"/>
+								<Texture name="$parentHealAbsorbBarLeftShadow" inherits="HealAbsorbBarLeftShadowTemplate"/>
+								<Texture name="$parentHealAbsorbBarRightShadow" inherits="HealAbsorbBarRightShadowTemplate"/>
+							</Layer>
+							<Layer level="BORDER">
 								<Texture name="PlayerFrameTexture" file="Interface\TargetingFrame\UI-TargetingFrame">
 									<TexCoords left="1.0" right="0.09375" top="0" bottom="0.78125"/>
 								</Texture>
@@ -170,6 +181,10 @@
 										</Anchor>
 									</Anchors>
 								</Texture>
+							</Layer>
+							<Layer level="ARTWORK" textureSubLevel="1">
+								<Texture name="$parentOverAbsorbGlow" inherits="OverAbsorbGlowTemplate"/>
+								<Texture name="$parentOverHealAbsorbGlow" inherits="OverHealAbsorbGlowTemplate"/>
 							</Layer>
 							<Layer level="OVERLAY">
 								<FontString name="PlayerHitIndicator" hidden="true" inherits="NumberFontNormalHuge">
@@ -371,6 +386,43 @@
 							<OnLeave function="GameTooltip_Hide"/>
 						</Scripts>
 					</Frame>
+					<Button parentKey="MultiGroupFrame" hidden="true">
+						<Size x="20" y="20"/>
+						<Anchors>
+							<Anchor point="TOPLEFT" x="52" y="-1"/>
+						</Anchors>
+						<Layers>
+							<Layer level="ARTWORK" textureSubLevel="0">
+								<Texture parentKey="HomePartyIcon" file="Interface\FriendsFrame\UI-Toast-FriendOnlineIcon">
+									<Size x="26" y="26"/>
+									<Anchors>
+										<Anchor point="CENTER" x="4" y="4"/>
+									</Anchors>
+									<Color r="0" g="0" b="1"/>
+								</Texture>
+							</Layer>
+							<Layer level="ARTWORK" textureSubLevel="1">
+								<Texture parentKey="InstancePartyIcon" file="Interface\FriendsFrame\UI-Toast-FriendOnlineIcon">
+									<Size x="26" y="26"/>
+									<Anchors>
+										<Anchor point="CENTER"/>
+									</Anchors>
+									<Color r="1" g="0" b="0"/>
+								</Texture>
+							</Layer>
+						</Layers>
+						<Scripts>
+							<OnLoad function="PlayerFrameMultiGroupFrame_OnLoad"/>
+							<OnEvent function="PlayerFrameMultiGroupFrame_OnEvent"/>
+							<OnEnter function="PlayerFrameMultiGroupframe_OnEnter"/>
+							<OnLeave>
+								GameTooltip:Hide();
+							</OnLeave>
+							<OnClick>
+								self:GetParent():GetParent():Click(button);
+							</OnClick>
+						</Scripts>
+					</Button>
 				</Frames>
 			</Frame>
 			<StatusBar name="PlayerFrameHealthBar" inherits="TextStatusBar">
@@ -401,8 +453,6 @@
 				</Scripts>
 				<BarTexture file="Interface\TargetingFrame\UI-StatusBar"/>
 			</StatusBar>
-			<StatusBar name="PlayerFrameMyHealPredictionBar" inherits="MyHealPredictionBarTemplate"/>
-			<StatusBar name="PlayerFrameOtherHealPredictionBar" inherits="OtherHealPredictionBarTemplate"/>
 			<StatusBar name="PlayerFrameManaBar" inherits="TextStatusBar">
 				<Size>
 					<AbsDimension x="119" y="12"/>

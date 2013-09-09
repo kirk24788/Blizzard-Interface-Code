@@ -17,6 +17,9 @@ WORLDSTATEALWAYSUPFRAME_SUSPENDEDCHATFRAMES = {};
 
 local inBattleground = false;
 
+local TEAM_HORDE = 0;
+local TEAM_ALLIANCE = 1;
+
 --
 FILTERED_BG_CHAT_ADD_GLOBALS = { "ERR_RAID_MEMBER_ADDED_S", "ERR_BG_PLAYER_JOINED_SS" };
 FILTERED_BG_CHAT_SUBTRACT_GLOBALS = { "ERR_RAID_MEMBER_REMOVED_S", "ERR_BG_PLAYER_LEFT_S" };
@@ -42,6 +45,7 @@ CLASS_BUTTONS = {
 	["WARLOCK"]	= {0.7421875, 0.98828125, 0.25, 0.5},
 	["PALADIN"]		= {0, 0.25, 0.5, 0.75},
 	["DEATHKNIGHT"]	= {0.25, 0.49609375, 0.5, 0.75},
+	["MONK"]	= {0.49609375, 0.7421875, 0.5, 0.75},
 };
 
 
@@ -60,7 +64,12 @@ function WorldStateAlwaysUpFrame_OnLoad(self)
 	self:RegisterEvent("PLAYER_ENTERING_BATTLEGROUND");
 
 	self:RegisterEvent("WORLD_STATE_UI_TIMER_UPDATE");
-		
+
+	self:RegisterEvent("WORLD_STATE_TIMER_START");
+	self:RegisterEvent("WORLD_STATE_TIMER_STOP");
+	
+	self:RegisterEvent("BATTLEGROUND_POINTS_UPDATE");
+
 	FILTERED_BG_CHAT_ADD = {};
 	FILTERED_BG_CHAT_SUBTRACT = {};
 	FILTERED_BG_CHAT_END = {};
@@ -102,32 +111,89 @@ end
 function WorldStateAlwaysUpFrame_OnEvent(self, event, ...)
 	if ( event == "PLAYER_ENTERING_WORLD" ) then
 		WorldStateFrame_ToggleBattlefieldMinimap();
-		WorldStateAlwaysUpFrame_StopBGChatFilter(self);	
+		WorldStateAlwaysUpFrame_StopBGChatFilter(self);
+		WorldStateChallengeMode_CheckTimers(GetWorldElapsedTimers());
+		WorldStateProvingGrounds_CheckTimers(GetWorldElapsedTimers());
 	elseif ( event == "PLAYER_ENTERING_BATTLEGROUND" ) then
 		WorldStateAlwaysUpFrame_StartBGChatFilter(self);
+	elseif ( event == "WORLD_STATE_TIMER_START" ) then
+		local timerID = ...;
+		WorldStateChallengeMode_CheckTimers(timerID);
+		WorldStateProvingGrounds_CheckTimers(timerID);
+	elseif ( event == "WORLD_STATE_TIMER_STOP" ) then
+		local timerID = ...;
+		WorldStateChallengeMode_HideTimer(timerID);
+		WorldStateProvingGrounds_HideTimer(timerID);
 	else
 		WorldStateAlwaysUpFrame_Update();
 	end
 end
 
+function WorldStateAlwaysUpFrame_AddFrame(alwaysUpShown, text, icon, dynamicIcon, dynamicTooltip, state)
+	local name = "AlwaysUpFrame"..alwaysUpShown;
+	local frame;
+	if ( alwaysUpShown > NUM_ALWAYS_UP_UI_FRAMES ) then
+		frame = CreateFrame("Frame", name, WorldStateAlwaysUpFrame, "WorldStateAlwaysUpTemplate");
+		NUM_ALWAYS_UP_UI_FRAMES = alwaysUpShown;
+	else
+		frame = _G[name];
+	end
+	if ( alwaysUpShown == 1 ) then
+		frame:SetPoint("TOP", WorldStateAlwaysUpFrame, -23 , -20);
+	else
+		local relative = _G["AlwaysUpFrame"..(alwaysUpShown - 1)];
+		frame:SetPoint("TOP", relative, "BOTTOM");
+	end
+	local frameText = _G[name.."Text"];
+	local frameIcon = _G[name.."Icon"];
+	local frameDynamicIcon = _G[name.."DynamicIconButtonIcon"];
+	local frameFlash = _G[name.."Flash"];
+	local flashTexture = _G[name.."FlashTexture"];
+	local frameDynamicButton = _G[name.."DynamicIconButton"];
+
+	frameText:SetText(text);
+	frameIcon:SetTexture(icon);
+	frameDynamicIcon:SetTexture(dynamicIcon);
+	local flash = nil;
+	if ( dynamicIcon ~= "" ) then
+		flash = dynamicIcon.."Flash"
+	end
+	flashTexture:SetTexture(flash);
+	frameDynamicButton.tooltip = dynamicTooltip;
+	if ( state == 2 ) then
+		UIFrameFlash(frameFlash, 0.5, 0.5, -1);
+		frameDynamicButton:Show();
+	elseif ( state == 3 ) then
+		UIFrameFlashStop(frameFlash);
+		frameDynamicButton:Show();
+	else
+		UIFrameFlashStop(frameFlash);
+		frameDynamicButton:Hide();
+	end
+	
+	frame:Show();
+	
+	return frame;
+end
+
 function WorldStateAlwaysUpFrame_Update()
 	local numUI = GetNumWorldStateUI();
-	local name, frame, frameText, frameDynamicIcon, frameIcon, frameFlash, flashTexture, frameDynamicButton;
+	local frame;
 	local extendedUI, extendedUIState1, extendedUIState2, extendedUIState3, uiInfo; 
-	local uiType, text, icon, state, hidden, dynamicIcon, tooltip, dynamicTooltip, flash, relative;
+	local uiType, text, icon, state, hidden, dynamicIcon, tooltip, dynamicTooltip;
 	local inInstance, instanceType = IsInInstance();
 	local alwaysUpShown = 1;
 	local extendedUIShown = 1;
 	local alwaysUpHeight = 10;
 	for i=1, numUI do
 		uiType, state, hidden, text, icon, dynamicIcon, tooltip, dynamicTooltip, extendedUI, extendedUIState1, extendedUIState2, extendedUIState3 = GetWorldStateUIInfo(i);
-		if ( (not hidden) and ((uiType ~= 1) or ((WORLD_PVP_OBJECTIVES_DISPLAY == "1") or (WORLD_PVP_OBJECTIVES_DISPLAY == "2" and IsSubZonePVPPOI()) or (instanceType == "pvp"))) ) then
+		if ( not hidden ) then
 			if ( state > 0 ) then
 				-- Handle always up frames and extended ui's completely differently
 				if ( extendedUI ~= "" ) then
 					-- extendedUI
 					uiInfo = ExtendedUI[extendedUI]
-					name = uiInfo.name..extendedUIShown;
+					local name = uiInfo.name..extendedUIShown;
 					if ( extendedUIShown > NUM_EXTENDED_UI_FRAMES ) then
 						frame = uiInfo.create(extendedUIShown);
 						NUM_EXTENDED_UI_FRAMES = extendedUIShown;
@@ -139,45 +205,7 @@ function WorldStateAlwaysUpFrame_Update()
 					extendedUIShown = extendedUIShown + 1;
 				else
 					-- Always Up
-					name = "AlwaysUpFrame"..alwaysUpShown;
-					if ( alwaysUpShown > NUM_ALWAYS_UP_UI_FRAMES ) then
-						frame = CreateFrame("Frame", name, WorldStateAlwaysUpFrame, "WorldStateAlwaysUpTemplate");
-						NUM_ALWAYS_UP_UI_FRAMES = alwaysUpShown;
-					else
-						frame = _G[name];
-					end
-					if ( alwaysUpShown == 1 ) then
-						frame:SetPoint("TOP", WorldStateAlwaysUpFrame, -23 , -20);
-					else
-						relative = _G["AlwaysUpFrame"..(alwaysUpShown - 1)];
-						frame:SetPoint("TOP", relative, "BOTTOM");
-					end
-					frameText = _G[name.."Text"];
-					frameIcon = _G[name.."Icon"];
-					frameDynamicIcon = _G[name.."DynamicIconButtonIcon"];
-					frameFlash = _G[name.."Flash"];
-					flashTexture = _G[name.."FlashTexture"];
-					frameDynamicButton = _G[name.."DynamicIconButton"];
-
-					frameText:SetText(text);
-					frameIcon:SetTexture(icon);
-					frameDynamicIcon:SetTexture(dynamicIcon);
-					flash = nil;
-					if ( dynamicIcon ~= "" ) then
-						flash = dynamicIcon.."Flash"
-					end
-					flashTexture:SetTexture(flash);
-					frameDynamicButton.tooltip = dynamicTooltip;
-					if ( state == 2 ) then
-						UIFrameFlash(frameFlash, 0.5, 0.5, -1);
-						frameDynamicButton:Show();
-					elseif ( state == 3 ) then
-						UIFrameFlashStop(frameFlash);
-						frameDynamicButton:Show();
-					else
-						UIFrameFlashStop(frameFlash);
-						frameDynamicButton:Hide();
-					end
+					frame = WorldStateAlwaysUpFrame_AddFrame(alwaysUpShown, text, icon, dynamicIcon, dynamicTooltip, state);
 					alwaysUpShown = alwaysUpShown + 1;
 					alwaysUpHeight = alwaysUpHeight + frame:GetHeight();
 				end	
@@ -186,10 +214,37 @@ function WorldStateAlwaysUpFrame_Update()
 				else
 					frame.tooltip = nil;
 				end
-				frame:Show();
 			end
 		end
 	end
+	
+	--[[
+	Disabling this for now
+	Long-term we'd like the battleground objectives to work more like this, but it's not working for 5.3
+	
+	local hordePoints, hordeMaxPoints = GetBattlegroundPoints(TEAM_HORDE);
+	local alliancePoints, allianceMaxPoints = GetBattlegroundPoints(TEAM_ALLIANCE);
+	
+	local scoreString = BATTLEGROUND_SCORE_VICTORY_POINTS;
+	if(GetAreaID() == 1105) then  -- Gold Rush BG
+		scoreString = BATTLEGROUND_SCORE_GOLD;
+	end
+	
+	if(allianceMaxPoints > 0) then
+		local text = format(scoreString, alliancePoints, allianceMaxPoints);
+		frame = WorldStateAlwaysUpFrame_AddFrame(alwaysUpShown, text, "Interface\\TargetingFrame\\UI-PVP-Alliance", "", 0, 1);
+		alwaysUpShown = alwaysUpShown + 1;
+		alwaysUpHeight = alwaysUpHeight + frame:GetHeight();
+	end
+	
+	if(hordeMaxPoints > 0) then
+		local text = format(scoreString, hordePoints, hordeMaxPoints);
+		frame = WorldStateAlwaysUpFrame_AddFrame(alwaysUpShown, text, "Interface\\TargetingFrame\\UI-PVP-Horde", "", 0, 1);
+		alwaysUpShown = alwaysUpShown + 1;
+		alwaysUpHeight = alwaysUpHeight + frame:GetHeight();
+	end
+	]]--
+	
 	for i=alwaysUpShown, NUM_ALWAYS_UP_UI_FRAMES do
 		frame = _G["AlwaysUpFrame"..i];
 		frame:Hide();
@@ -463,6 +518,7 @@ end
 function WorldStateScoreFrame_Update()
 	local isArena, isRegistered = IsActiveBattlefieldArena();
 	local isRatedBG = IsRatedBattleground();
+	local isWargame = IsWargame();
 	local battlefieldWinner = GetBattlefieldWinner(); 
 	
 	local firstFrameAfterCustomStats = WorldStateScoreFrameHonorGained;
@@ -479,21 +535,21 @@ function WorldStateScoreFrame_Update()
 		WorldStateScoreFrameHonorGained:Hide();
 		WorldStateScoreFrameBgRating:Hide();
 
+		if ( isWargame ) then
+			WorldStateScoreFrameRatingChange:Hide()
+		end
+		WorldStateScoreFrameName:SetWidth(325)
+		
 		-- Reanchor some columns.
 		WorldStateScoreFrameDamageDone:SetPoint("LEFT", WorldStateScoreFrameKB, "RIGHT", -5, 0);
-		if ( isRegistered ) then
-			WorldStateScoreFrameTeam:Show();
-			WorldStateScoreFrameKB:SetPoint("LEFT", WorldStateScoreFrameTeam, "RIGHT", -10, 0);
-			WorldStateScoreFrameMatchmakingRating:Hide();
+		WorldStateScoreFrameTeam:Hide();
+		if ( not isWargame ) then
 			WorldStateScoreFrameRatingChange:Show();
 			WorldStateScoreFrameRatingChange:SetPoint("LEFT", WorldStateScoreFrameHealingDone, "RIGHT", 0, 0);
 			WorldStateScoreFrameRatingChange.sortType = "bgratingChange";
-		else
-			WorldStateScoreFrameMatchmakingRating:Hide();
-			WorldStateScoreFrameRatingChange:Hide();
-			WorldStateScoreFrameTeam:Hide();
-			WorldStateScoreFrameKB:SetPoint("LEFT", WorldStateScoreFrameName, "RIGHT", 4, 0);
 		end
+		WorldStateScoreFrameMatchmakingRating:Hide();
+		WorldStateScoreFrameKB:SetPoint("LEFT", WorldStateScoreFrameName, "RIGHT", 4, 0);
 	else
 		-- Show Tabs
 		WorldStateScoreFrameTab1:Show();
@@ -503,6 +559,8 @@ function WorldStateScoreFrame_Update()
 		WorldStateScoreFrameTeam:Hide();
 		WorldStateScoreFrameDeaths:Show();
 
+		WorldStateScoreFrameName:SetWidth(175)
+		
 		-- Reanchor some columns.
 		WorldStateScoreFrameKB:SetPoint("LEFT", WorldStateScoreFrameName, "RIGHT", 4, 0);
 		
@@ -558,8 +616,13 @@ function WorldStateScoreFrame_Update()
 		-- Show winner
 		if ( isArena ) then
 			if ( isRegistered ) then
-				local teamName = GetBattlefieldTeamInfo(battlefieldWinner);
-				if ( teamName ) then
+				if ( GetBattlefieldTeamInfo(battlefieldWinner) ) then
+					local teamName
+					if ( battlefieldWinner == 0) then
+						teamName = ARENA_TEAM_NAME_GREEN
+					else
+						teamName = ARENA_TEAM_NAME_GOLD
+					end
 					WorldStateScoreWinnerFrameText:SetFormattedText(VICTORY_TEXT_ARENA_WINS, teamName);			
 				else
 					WorldStateScoreWinnerFrameText:SetText(VICTORY_TEXT_ARENA_DRAW);							
@@ -711,7 +774,7 @@ function WorldStateScoreFrame_Update()
 			end
 
 			if ( isArena ) then
-				scoreButton.name.text:SetWidth(150);
+				scoreButton.name.text:SetWidth(350);
 				if ( isRegistered ) then
 					scoreButton.team:SetText(teamName);
 					scoreButton.team:Show();
@@ -968,7 +1031,17 @@ function ToggleWorldStateScoreFrame()
 	if ( WorldStateScoreFrame:IsShown() ) then
 		HideUIPanel(WorldStateScoreFrame);
 	else
-		if ( ( not IsActiveBattlefieldArena() or GetBattlefieldWinner() ) and MiniMapBattlefieldFrame.status == "active" ) then
+		--Make sure we're in an active BG
+		local inBattlefield = false;
+		for i=1, GetMaxBattlefieldID() do
+			local status = GetBattlefieldStatus(i);
+			if ( status == "active" ) then
+				inBattlefield = true;
+				break;
+			end
+		end
+
+		if ( ( not IsActiveBattlefieldArena() or GetBattlefieldWinner() ) and inBattlefield ) then
 			ShowUIPanel(WorldStateScoreFrame);
 		end
 	end
@@ -1009,4 +1082,316 @@ function ScorePlayerDropDown_Initialize()
 	info.text = CANCEL;
 	info.func = ScorePlayerDropDown_Cancel;
 	UIDropDownMenu_AddButton(info);
+end
+
+--
+-- Challenge Mode - only 1 timer for now, needs some work for multiple timers
+--
+
+-- WatchFrame handler function
+function WorldStateChallengeMode_DisplayTimers(lineFrame, nextAnchor, maxHeight, frameWidth)
+	local self = WorldStateChallengeModeFrame;
+	if ( self.timerID ) then
+		self:SetParent(lineFrame);
+		if (nextAnchor) then
+			self:SetPoint("TOPLEFT", nextAnchor, "BOTTOMLEFT", 0, -WATCHFRAME_TYPE_OFFSET);
+		else
+			self:SetPoint("TOPLEFT", lineFrame, "TOPLEFT", 0, -WATCHFRAME_INITIAL_OFFSET)
+		end
+		local _, elapsedTime = GetWorldElapsedTime(self.timerID);
+		WorldStateChallengeModeTimer.baseTime = elapsedTime;
+		WorldStateChallengeModeTimer.timeSinceBase = 0;
+		WorldStateChallengeModeTimer.frame = self;
+		self:Show();
+		return self, 198, 0, 1;
+	else
+		-- handler should have been removed before this...
+		self:Hide();
+		return nextAnchor, 0, 0, 0;
+	end
+end
+
+function WorldStateChallengeMode_CheckTimers(...)
+	for i = 1, select("#", ...) do
+		local timerID = select(i, ...);
+		local _, elapsedTime, type = GetWorldElapsedTime(timerID);
+		if ( type == LE_WORLD_ELAPSED_TIMER_TYPE_CHALLENGE_MODE) then
+			local _, _, _, _, _, _, _, mapID = GetInstanceInfo();
+			if ( mapID ) then
+				WorldStateChallengeMode_ShowTimer(timerID, elapsedTime, GetChallengeModeMapTimes(mapID));
+				return;
+			end
+		end	
+	end
+	WorldStateChallengeMode_HideTimer();
+end
+
+function WorldStateChallengeMode_ShowTimer(timerID, elapsedTime, ...)
+	local self = WorldStateChallengeModeFrame;
+	if not ( self.medalTimes ) then
+		self.medalTimes = { };
+	end
+	for i = 1, select("#", ...) do
+		self.medalTimes[i] = select(i, ...);
+	end
+	-- not currently being displayed, set up handler
+	if ( not self.timerID ) then
+		WatchFrame_AddObjectiveHandler(WorldStateChallengeMode_DisplayTimers, 1);
+		if ( WatchFrame_RemoveObjectiveHandler(WatchFrame_DisplayTrackedQuests) ) then
+			self.hidWatchedQuests = true;
+		end
+	end
+	self.timerID = timerID;
+	WorldStateChallengeModeFrame_UpdateMedal(self, elapsedTime);
+	WorldStateChallengeModeFrame_UpdateValues(self, elapsedTime);
+	WatchFrame_ClearDisplay();
+	WatchFrame_Expand(WatchFrame);	-- will automatically do a watchframe update
+	WorldStateChallengeModeTimer:Show();
+end
+
+function WorldStateChallengeMode_HideTimer(timerID)
+	local self = WorldStateChallengeModeFrame;
+	if ( not timerID or self.timerID == timerID ) then
+		self.timerID = nil;
+		if ( self.hidWatchedQuests ) then
+			WatchFrame_AddObjectiveHandler(WatchFrame_DisplayTrackedQuests);
+		end
+		self:Hide();
+		WorldStateChallengeModeTimer:Hide();
+		self.lastMedalShown = nil;
+		WatchFrame_RemoveObjectiveHandler(WorldStateChallengeMode_DisplayTimers);
+		WatchFrame_ClearDisplay();
+		WatchFrame_Update(WatchFrame);
+	end
+end
+
+function WorldStateChallengeModeFrame_UpdateMedal(self, elapsedTime)
+	-- find best medal for current time
+	local prevMedalTime = 0;
+	for i = #self.medalTimes, 1, -1 do
+		local currentMedalTime = self.medalTimes[i];
+		if ( elapsedTime < currentMedalTime ) then
+			self.statusBar:SetMinMaxValues(0, currentMedalTime - prevMedalTime);
+			self.statusBar.medalTime = currentMedalTime;
+			if ( CHALLENGE_MEDAL_TEXTURES[i] ) then
+				self.medalIcon:SetTexture(CHALLENGE_MEDAL_TEXTURES[i]);
+				self.medalIcon:Show();
+				self.GlowFrame.MedalIcon:SetTexture(CHALLENGE_MEDAL_TEXTURES[i]);
+				self.GlowFrame.MedalGlowAnim:Play();
+			end
+			self.noMedal:Hide();
+			-- play sound if medal changed
+			if ( self.lastMedalShown and self.lastMedalShown ~= i ) then
+				if ( self.lastMedalShown == CHALLENGE_MEDAL_GOLD ) then
+					PlaySound("UI_Challenges_MedalExpires_GoldtoSilver");
+				elseif ( self.lastMedalShown == CHALLENGE_MEDAL_SILVER ) then
+					PlaySound("UI_Challenges_MedalExpires_SilvertoBronze");
+				else
+					PlaySound("UI_Challenges_MedalExpires");
+				end
+			end
+			self.lastMedalShown = i;
+			return;
+		else
+			prevMedalTime = currentMedalTime;
+		end
+	end
+	-- no medal
+	self.statusBar.timeLeft:SetText(CHALLENGES_TIMER_NO_MEDAL);
+	self.statusBar:SetValue(0);
+	self.statusBar.medalTime = nil;
+	self.noMedal:Show();
+	self.medalIcon:Hide();
+	-- play sound if medal changed
+	if ( self.lastMedalShown and self.lastMedalShown ~= 0 ) then
+		PlaySound("UI_Challenges_MedalExpires");
+	end
+	self.lastMedalShown = 0;
+end
+
+function WorldStateChallengeModeFrame_UpdateValues(self, elapsedTime)
+	local statusBar = self.statusBar;
+	if ( statusBar.medalTime ) then
+		local timeLeft = statusBar.medalTime - elapsedTime;
+		local anim = self.GlowFrame.MedalPulseAnim;
+		if (timeLeft <= 5) then
+			if (anim:IsPlaying()) then 
+				anim.timeLeft = timeLeft;
+			else
+				self.GlowFrame.MedalPulseAnim:Play();
+			end
+		end
+		if (timeLeft == 10) then
+			if (not self.playedSound) then
+				PlaySoundKitID(34154);
+				self.playedSound = true;
+			end
+		else
+			self.playedSound = false;
+		end
+		if ( timeLeft < 0 ) then
+			WorldStateChallengeModeFrame_UpdateMedal(self, elapsedTime);
+		else
+			statusBar:SetValue(statusBar.medalTime - elapsedTime);
+			statusBar.timeLeft:SetText(GetTimeStringFromSeconds(statusBar.medalTime - elapsedTime));
+		end
+	end
+end
+
+function WorldStateChallengeModeAnim_OnFinished(self)
+	if (self.timeLeft and self.timeLeft > 0 and self.timeLeft < 5) then
+		self:Play();
+	else
+		self.timeLeft = nil;
+	end
+end
+
+local floor = floor; --optimization so we don't do a global lookup on update
+function WorldStateChallengeModeTimer_OnUpdate(self, elapsed)
+	self.timeSinceBase = self.timeSinceBase + elapsed;
+	WorldStateChallengeModeFrame_UpdateValues(self.frame, floor(self.baseTime + self.timeSinceBase));
+end
+
+--
+-- Proving Grounds
+--
+
+-- WatchFrame handler function
+function WorldStateProvingGrounds_DisplayTimers(lineFrame, nextAnchor, maxHeight, frameWidth)
+	local self = WorldStateProvingGroundsFrame;
+	if ( self.timerID ) then
+		self:SetParent(lineFrame);
+		if (nextAnchor) then
+			self:SetPoint("TOPLEFT", nextAnchor, "BOTTOMLEFT", 0, -WATCHFRAME_TYPE_OFFSET);
+		else
+			self:SetPoint("TOPLEFT", lineFrame, "TOPLEFT", 0, -WATCHFRAME_INITIAL_OFFSET)
+		end
+		local _, elapsedTime = GetWorldElapsedTime(self.timerID);
+		WorldStateProvingGroundsTimer.baseTime = elapsedTime;
+		WorldStateProvingGroundsTimer.timeSinceBase = 0;
+		WorldStateProvingGroundsTimer.frame = self;
+		self:Show();
+		WatchFrameScenario_UpdateScenario();
+		return self, 198, 0, 1;
+	else
+		-- handler should have been removed before this...
+		self:Hide();
+		return nextAnchor, 0, 0, 0;
+	end
+end
+
+function WorldStateProvingGrounds_CheckTimers(...)
+	for i = 1, select("#", ...) do
+		local timerID = select(i, ...);
+		local _, elapsedTime, type = GetWorldElapsedTime(timerID);
+		if ( type == LE_WORLD_ELAPSED_TIMER_TYPE_PROVING_GROUND) then
+			local diffID, currWave, maxWave, duration = C_Scenario.GetProvingGroundsInfo()
+			if (duration > 0) then
+				WorldStateProvingGrounds_ShowTimer(timerID, elapsedTime, duration, diffID, currWave, maxWave);
+				return;
+			end
+		end	
+	end
+	WorldStateProvingGrounds_HideTimer();
+end
+
+local PROVING_GROUNDS_ENDLESS_INDEX = 4;
+function WorldStateProvingGrounds_ShowTimer(timerID, elapsedTime, duration, medalIndex, currWave, maxWave)
+	local self = WorldStateProvingGroundsFrame;
+	local statusBar = self.statusBar;
+	
+	-- not currently being displayed, set up handler
+	if ( not self.timerID ) then
+		WatchFrame_AddObjectiveHandler(WorldStateProvingGrounds_DisplayTimers, 1);
+		if ( WatchFrame_RemoveObjectiveHandler(WatchFrame_DisplayTrackedQuests) ) then
+			self.hidWatchedQuests = true;
+		end
+	end
+	
+	self.timerID = timerID;
+	statusBar.duration = duration;
+	statusBar:SetMinMaxValues(0, duration);
+	if ( CHALLENGE_MEDAL_TEXTURES[medalIndex] ) then
+		self.MedalIcon:SetTexture(CHALLENGE_MEDAL_TEXTURES[medalIndex]);
+		self.MedalIcon:Show();
+	end
+	
+	if (medalIndex < PROVING_GROUNDS_ENDLESS_INDEX) then
+		self.ScoreLabel:Hide();
+		self.Score:Hide();
+		self.WaveLabel:SetPoint("TOPLEFT", self.MedalIcon, "TOPRIGHT", 1, -4);
+		self.Wave:SetFormattedText(GENERIC_FRACTION_STRING, currWave, maxWave);
+		statusBar:SetPoint("CENTER", self, "CENTER", 22, -8);
+	else
+		self.ScoreLabel:Show();
+		self.Score:Show();
+		self.WaveLabel:SetPoint("TOPLEFT", self.MedalIcon, "TOPRIGHT", 1, 4);
+		self.Wave:SetText(currWave);
+		statusBar:SetPoint("CENTER", self, "CENTER", 22, -17);
+	end
+	
+	self:RegisterEvent("PROVING_GROUNDS_SCORE_UPDATE");
+	WorldStateProvingGroundsFrame_UpdateValues(self, elapsedTime);
+	self.CountdownAnim.timeLeft = nil;
+	WatchFrame_ClearDisplay();
+	WatchFrame_Expand(WatchFrame);	-- will automatically do a watchframe update
+	WorldStateProvingGroundsTimer:Show();
+end
+
+function WorldStateProvingGrounds_HideTimer(timerID)
+	local self = WorldStateProvingGroundsFrame;
+	if ( not timerID or self.timerID == timerID ) then
+		self.timerID = nil;
+		if ( self.hidWatchedQuests ) then
+			WatchFrame_AddObjectiveHandler(WatchFrame_DisplayTrackedQuests);
+		end
+		self:UnregisterEvent("PROVING_GROUNDS_SCORE_UPDATE");
+		self:Hide();
+		WorldStateProvingGroundsTimer:Hide();
+		WatchFrame_RemoveObjectiveHandler(WorldStateProvingGrounds_DisplayTimers);
+		WatchFrame_ClearDisplay();
+		WatchFrame_Update(WatchFrame);
+	end
+end
+
+function WorldStateProvingGroundsFrame_UpdateValues(self, elapsedTime)
+	WatchFrameHeader:Show()
+	local statusBar = self.statusBar;
+	if ( elapsedTime < statusBar.duration ) then
+		statusBar:SetValue(statusBar.duration - elapsedTime);
+		statusBar.timeLeft:SetText(GetTimeStringFromSeconds(statusBar.duration - elapsedTime));
+		
+		local timeLeft = statusBar.duration - elapsedTime;
+		local anim = self.CountdownAnim;
+		if (timeLeft <= 5) then
+			if (anim:IsPlaying()) then 
+				anim.timeLeft = timeLeft;
+			else
+				anim:Play();
+			end
+		elseif (anim.timeLeft ~= nil) then
+			-- the time left never reaches 0 if there's another wave, but the animation always needs to get to 0
+			anim.timeLeft = 0; 
+		end
+	end
+end
+
+function WorldStateProvingGrounds_OnEvent(self, event, ...)
+	if (event == "PROVING_GROUNDS_SCORE_UPDATE") then
+		local score = ...
+		self.Score:SetText(score);
+	end
+end
+
+function WorldStateProvingGroundsTimer_OnUpdate(self, elapsed)
+	self.timeSinceBase = self.timeSinceBase + elapsed;
+	WorldStateProvingGroundsFrame_UpdateValues(self.frame, floor(self.baseTime + self.timeSinceBase));
+end
+
+function WorldStateProvingGroundsAnim_OnFinished(self)
+	if (self.timeLeft and self.timeLeft > 0 and self.timeLeft < 5) then
+		self:Play();
+	else
+		self.timeLeft = nil;
+	end
 end

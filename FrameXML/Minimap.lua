@@ -15,8 +15,6 @@ LFG_EYE_TEXTURES["unknown"] = { file = "Interface\\LFGFrame\\WaitAnim", width = 
 
 function Minimap_OnLoad(self)
 	self.fadeOut = nil;
-	Minimap:SetPlayerTextureHeight(40);
-	Minimap:SetPlayerTextureWidth(40);
 	self:RegisterEvent("MINIMAP_PING");
 	self:RegisterEvent("MINIMAP_UPDATE_ZOOM");
 	self:RegisterEvent("PLAYER_TARGET_CHANGED");
@@ -113,15 +111,6 @@ function Minimap_SetPing(x, y, playSound)
 	end
 end
 
-function MiniMapBattlefieldFrame_OnUpdate (self, elapsed)
-	if ( GameTooltip:IsOwned(self) ) then
-		PVP_UpdateStatus(1);
-		if ( self.tooltip ) then
-			GameTooltip:SetText(self.tooltip, nil, nil, nil, nil, 1);
-		end
-	end
-end
-
 function Minimap_ZoomInClick()
 	MinimapZoomOut:Enable();
 	PlaySound("igMiniMapZoomIn");
@@ -162,7 +151,7 @@ function Minimap_ZoomOut()
 end
 
 function EyeTemplate_OnUpdate(self, elapsed)
-	local textureInfo = LFG_EYE_TEXTURES[self.queueType];
+	local textureInfo = LFG_EYE_TEXTURES[self.queueType or "default"];
 	AnimateTexCoords(self.texture, textureInfo.width, textureInfo.height, textureInfo.iconSize, textureInfo.iconSize, textureInfo.frames, elapsed, textureInfo.delay)
 end
 
@@ -175,218 +164,8 @@ function EyeTemplate_StopAnimating(eye)
 	if ( eye.texture.frame ) then
 		eye.texture.frame = 1;	--To start the animation over.
 	end
-	local textureInfo = LFG_EYE_TEXTURES[eye.queueType];
+	local textureInfo = LFG_EYE_TEXTURES[eye.queueType or "default"];
 	eye.texture:SetTexCoord(0, textureInfo.iconSize / textureInfo.width, 0, textureInfo.iconSize / textureInfo.height);
-end
-
-function MiniMapLFG_Update()
-	local mode, submode = GetLFGMode();
-	if ( mode ) then
-		local queueType;
-		if ( mode == "queued" and not GetLFGQueueStats() ) then
-			queueType = "unknown";
-		else
-			queueType = GetLFGModeType();
-		end
-		if ( queueType ~= MiniMapLFGFrame.eye.queueType ) then
-			local eye = MiniMapLFGFrame.eye;
-			if ( eye.queueType ) then
-				eye.texture.frame = nil;			-- to clear saved animation settings
-				EyeTemplate_StopAnimating(eye);
-			end
-			eye.texture:SetTexture(LFG_EYE_TEXTURES[queueType].file);
-			eye.queueType = queueType;
-			EyeTemplate_StopAnimating(eye);			-- to set icon to the first frame
-			local frameLevel = MiniMapLFGFrame:GetFrameLevel();
-			if ( eye:GetFrameLevel() >= frameLevel ) then
-				eye:SetFrameLevel(frameLevel - 1);
-			end
-		end
-		MiniMapLFGFrame:Show();
-		if ( mode == "queued" or mode == "listed" or mode == "rolecheck" or mode == "suspended" ) then
-			EyeTemplate_StartAnimating(MiniMapLFGFrame.eye);
-		else
-			EyeTemplate_StopAnimating(MiniMapLFGFrame.eye);
-		end
-
-		if ( mode == "lfgparty" or mode == "abandonedInDungeon" ) then
-			local name, typeID, subtypeID, minLevel, maxLevel, recLevel, minRecLevel, maxRecLevel, expansionLevel, groupID, textureFilename, difficulty, maxPlayers, description, isHoliday = GetLFGDungeonInfo(GetPartyLFGID());
-			local numPlayers = max(GetNumPartyMembers() + 1, GetNumRaidMembers());
-			if ( numPlayers < maxPlayers ) then
-				MiniMapLFGFrame.groupSize:Show();
-				MiniMapLFGFrame.groupSize:SetText(numPlayers);
-			else
-				MiniMapLFGFrame.groupSize:Hide();
-			end
-		else
-			MiniMapLFGFrame.groupSize:Hide();
-		end
-
-	else
-		MiniMapLFGFrame:Hide();
-	end
-end
-
-function MiniMapLFGFrame_TeleportIn()
-	LFGTeleport(false);
-end
-
-function MiniMapLFGFrame_TeleportOut()
-	LFGTeleport(true);
-end
-
-function MiniMapLFGFrameDropDown_Update()
-	local info = UIDropDownMenu_CreateInfo();
-	
-	local mode, submode = GetLFGMode();
-
-	--This one can appear in addition to others, so we won't just check the mode.
-	if ( IsPartyLFG() ) then
-		local addButton = false;
-		if ( IsInLFGDungeon() ) then
-			info.text = TELEPORT_OUT_OF_DUNGEON;
-			info.func = MiniMapLFGFrame_TeleportOut;
-			addButton = true;
-		elseif ((GetNumPartyMembers() > 0) or (GetNumRaidMembers() > 0)) then
-			info.text = TELEPORT_TO_DUNGEON;
-			info.func = MiniMapLFGFrame_TeleportIn;
-			addButton = true;
-		end
-		if ( addButton ) then
-			UIDropDownMenu_AddButton(info);
-		end
-	end
-	
-	if ( mode == "proposal" and submode == "unaccepted" ) then
-		info.text = ENTER_DUNGEON;
-		info.func = AcceptProposal;
-		UIDropDownMenu_AddButton(info);
-		
-		info.text = LEAVE_QUEUE;
-		info.func = RejectProposal;
-		UIDropDownMenu_AddButton(info);
-	elseif ( mode == "queued" or mode == "suspended" ) then
-		info.text = LEAVE_QUEUE;
-		info.func = LeaveLFG;
-		info.disabled = (submode == "unempowered");
-		UIDropDownMenu_AddButton(info);
-	elseif ( mode == "listed" ) then
-		if ((GetNumPartyMembers() > 0) or (GetNumRaidMembers() > 0)) then
-			info.text = UNLIST_MY_GROUP;
-		else
-			info.text = UNLIST_ME;
-		end
-		info.func = LeaveLFG;
-		info.disabled = (submode == "unempowered");
-		UIDropDownMenu_AddButton(info);
-	end
-end
-
-function MiniMapLFGFrame_OnClick(self, button)
-	local mode, submode = GetLFGMode();
-	if ( button == "RightButton" or mode == "lfgparty" or mode == "abandonedInDungeon") then
-		--Display dropdown
-		PlaySound("igMainMenuOpen");
-		--Weird hack so that the popup isn't under the queued status window (bug 184001)
-		local yOffset;
-		if ( mode == "queued" ) then
-			MiniMapLFGFrameDropDown.point = "BOTTOMRIGHT";
-			MiniMapLFGFrameDropDown.relativePoint = "TOPLEFT";
-			yOffset = 0;
-		else
-			MiniMapLFGFrameDropDown.point = nil;
-			MiniMapLFGFrameDropDown.relativePoint = nil;
-			yOffset = -5;
-		end
-		ToggleDropDownMenu(1, nil, MiniMapLFGFrameDropDown, "MiniMapLFGFrame", 0, yOffset);
-	elseif ( mode == "proposal" ) then
-		if ( not LFGDungeonReadyPopup:IsShown() ) then
-			PlaySound("igCharacterInfoTab");
-			StaticPopupSpecial_Show(LFGDungeonReadyPopup);
-		end
-	elseif ( mode == "queued" or mode == "rolecheck" or mode == "suspended" ) then
-		local inParty, joined, queued, noPartialClear, achievements, lfgComment, slotCount, isRaidFinder = GetLFGInfoServer();
-		if ( isRaidFinder ) then
-			ToggleRaidFrame(1);
-		else
-			ToggleLFDParentFrame();
-		end
-	elseif ( mode == "listed" ) then
-		ToggleFriendsFrame(4);
-	end
-end
-
-function MiniMapLFGFrame_OnEnter(self)
-	local mode, submode = GetLFGMode();
-	local queueType = GetLFGModeType();
-	if ( mode == "queued" ) then
-		LFGSearchStatus:Show();
-	elseif ( mode == "proposal" ) then
-		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		if ( queueType == "raid" ) then
-			GameTooltip:SetText(RAID_FINDER);
-		else
-			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
-		end
-		GameTooltip:AddLine(DUNGEON_GROUP_FOUND_TOOLTIP, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
-		GameTooltip:AddLine(" ");
-		GameTooltip:AddLine(CLICK_HERE_FOR_MORE_INFO, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
-		GameTooltip:Show();
-	elseif ( mode == "rolecheck" ) then
-		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		if ( queueType == "raid" ) then
-			GameTooltip:SetText(RAID_FINDER);
-		else
-			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
-		end
-		GameTooltip:AddLine(ROLE_CHECK_IN_PROGRESS_TOOLTIP, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
-		GameTooltip:Show();
-	elseif ( mode == "listed" ) then
-		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		if ( queueType == "raid" ) then
-			GameTooltip:SetText(LOOKING_FOR_RAID);
-		else
-			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
-		end
-		GameTooltip:AddLine(YOU_ARE_LISTED_IN_LFR, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
-		GameTooltip:Show();
-	elseif ( mode == "lfgparty" ) then
-		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		if ( queueType == "raid" ) then
-			GameTooltip:SetText(RAID_FINDER);
-		else
-			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
-		end
-		GameTooltip:AddLine(YOU_ARE_IN_DUNGEON_GROUP, NORMAL_FONT_COLOR.r, NORMAL_FONT_COLOR.g, NORMAL_FONT_COLOR.b, 1);
-
-		local dungeonID = GetPartyLFGID();
-		local numEncounters, numCompleted = GetLFGDungeonNumEncounters(dungeonID);
-		if ( numCompleted > 0 ) then
-			GameTooltip:AddLine(" ");
-			GameTooltip:AddLine(ERR_LOOT_GONE);
-			for i=1, numEncounters do
-				local bossName, texture, isKilled = GetLFGDungeonEncounterInfo(dungeonID, i);
-				if ( isKilled ) then
-					GameTooltip:AddLine(bossName, RED_FONT_COLOR.r, RED_FONT_COLOR.g, RED_FONT_COLOR.b);
-				end
-			end
-		end
-		GameTooltip:Show();
-	elseif ( mode == "suspended" ) then
-		GameTooltip:SetOwner(self, "ANCHOR_LEFT");
-		if ( queueType == "raid" ) then
-			GameTooltip:SetText(RAID_FINDER);
-		else
-			GameTooltip:SetText(LOOKING_FOR_DUNGEON);
-		end
-		GameTooltip:AddLine(IN_LFG_QUEUE_BUT_SUSPENDED, nil, nil, nil, 1);
-		GameTooltip:Show();
-	end
-end
-
-function MiniMapLFGFrame_OnLeave(self)
-	GameTooltip:Hide();
-	LFGSearchStatus:Hide();
 end
 
 function MinimapButton_OnMouseDown(self, button)
@@ -514,7 +293,7 @@ function MiniMapTrackingDropDown_Initialize(self, level)
 				info.notCheckable = true;
 				info.keepShownOnClick = false;
 				info.hasArrow = true;
-				info.value = 1;
+				info.value = HUNTER_TRACKING;
 				UIDropDownMenu_AddButton(info, level)
 			end
 		end
@@ -524,7 +303,7 @@ function MiniMapTrackingDropDown_Initialize(self, level)
 		info.notCheckable = true;
 		info.keepShownOnClick = false;
 		info.hasArrow = true;
-		info.value = 2;
+		info.value = TOWNSFOLK;
 		UIDropDownMenu_AddButton(info, level)
 	end
 
@@ -578,8 +357,6 @@ end
 -- Dungeon Difficulty
 --
 						
-local selectedRaidDifficulty;
-local allowedRaidDifficulty;
 local IS_GUILD_GROUP;
 
 function MiniMapInstanceDifficulty_OnEvent(self, event, ...)
@@ -589,7 +366,7 @@ function MiniMapInstanceDifficulty_OnEvent(self, event, ...)
 			IS_GUILD_GROUP = isGuildGroup;
 			MiniMapInstanceDifficulty_Update();
 		end
-	elseif ( event == "PLAYER_DIFFICULTY_CHANGED" ) then
+	elseif ( event == "PLAYER_DIFFICULTY_CHANGED" or event == "INSTANCE_GROUP_SIZE_CHANGED") then
 		MiniMapInstanceDifficulty_Update();
 	elseif ( event == "UPDATE_INSTANCE_INFO" ) then
 		RequestGuildPartyState();
@@ -609,85 +386,76 @@ function MiniMapInstanceDifficulty_OnEvent(self, event, ...)
 end
 
 function MiniMapInstanceDifficulty_Update()
-	local _, instanceType, difficulty, _, maxPlayers, playerDifficulty, isDynamicInstance = GetInstanceInfo();
-	if ( IS_GUILD_GROUP or ((instanceType == "party" or instanceType == "raid") and not (difficulty == 1 and maxPlayers == 5)) ) then
-		local isHeroic = false;
-		if ( instanceType == "party" and difficulty == 2 ) then
-			isHeroic = true;
-		elseif ( instanceType == "raid" ) then
-			if ( isDynamicInstance ) then
-				selectedRaidDifficulty = difficulty;
-				--if ( selectedRaidDifficulty > 1 ) then
-				--	isHeroic = true;
-				--end
-				-- if modified difficulty is normal then you are allowed to select heroic, and vice-versa
-				if ( selectedRaidDifficulty == 1 ) then
-					allowedRaidDifficulty = 3;
-				elseif ( selectedRaidDifficulty == 2 ) then
-					allowedRaidDifficulty = 4;
-				elseif ( selectedRaidDifficulty == 3 ) then
-					allowedRaidDifficulty = 1;
-				elseif ( selectedRaidDifficulty == 4 ) then
-					allowedRaidDifficulty = 2;
-				end
-				allowedRaidDifficulty = "RAID_DIFFICULTY"..allowedRaidDifficulty;
-			end
-			if ( difficulty > 2 ) then
-				isHeroic = true;
-			end
-		end
-		if ( IS_GUILD_GROUP ) then
-			if ( maxPlayers == 0 ) then
-				GuildInstanceDifficultyText:SetText("");
-				GuildInstanceDifficultyDarkBackground:SetAlpha(0);
-				GuildInstanceDifficulty.emblem:SetPoint("TOPLEFT", 12, -16);
-			else
-				GuildInstanceDifficultyText:SetText(maxPlayers);
-				GuildInstanceDifficultyDarkBackground:SetAlpha(0.7);
-				GuildInstanceDifficulty.emblem:SetPoint("TOPLEFT", 12, -10);
-			end
-			GuildInstanceDifficultyText:ClearAllPoints();
-			if ( isHeroic ) then
-				if ( maxPlayers > 10 ) then
-					GuildInstanceDifficultyHeroicTexture:SetPoint("BOTTOMLEFT", 8, 7);
-					GuildInstanceDifficultyText:SetPoint("BOTTOMLEFT", 20, 8);
-				else
-					GuildInstanceDifficultyHeroicTexture:SetPoint("BOTTOMLEFT", 11, 7);
-					GuildInstanceDifficultyText:SetPoint("BOTTOMLEFT", 23, 8);
-				end
-				GuildInstanceDifficultyHeroicTexture:Show();
-			else
-				GuildInstanceDifficultyHeroicTexture:Hide();
-				GuildInstanceDifficultyText:SetPoint("BOTTOM", 2, 8);
-			end
-			MiniMapInstanceDifficulty:Hide();
-			SetSmallGuildTabardTextures("player", GuildInstanceDifficulty.emblem, GuildInstanceDifficulty.background, GuildInstanceDifficulty.border);
-			GuildInstanceDifficulty:Show();
+	local _, instanceType, difficulty, _, maxPlayers, playerDifficulty, isDynamicInstance, _, instanceGroupSize = GetInstanceInfo();
+	local _, _, isHeroic, isChallengeMode = GetDifficultyInfo(difficulty);
+
+	if ( IS_GUILD_GROUP ) then
+		if ( instanceGroupSize == 0 ) then
+			GuildInstanceDifficultyText:SetText("");
+			GuildInstanceDifficultyDarkBackground:SetAlpha(0);
+			GuildInstanceDifficulty.emblem:SetPoint("TOPLEFT", 12, -16);
 		else
-			MiniMapInstanceDifficultyText:SetText(maxPlayers);
-			-- the 1 looks a little off when text is centered
-			local xOffset = 0;
-			if ( maxPlayers >= 10 and maxPlayers <= 19 ) then
-				xOffset = -1;
-			end
-			if ( isHeroic ) then
-				MiniMapInstanceDifficultyTexture:SetTexCoord(0, 0.25, 0.0703125, 0.4140625);
-				MiniMapInstanceDifficultyText:SetPoint("CENTER", xOffset, -9);
-			else
-				MiniMapInstanceDifficultyTexture:SetTexCoord(0, 0.25, 0.5703125, 0.9140625);
-				MiniMapInstanceDifficultyText:SetPoint("CENTER", xOffset, 5);
-			end
-			MiniMapInstanceDifficulty:Show();
-			GuildInstanceDifficulty:Hide();
+			GuildInstanceDifficultyText:SetText(instanceGroupSize);
+			GuildInstanceDifficultyDarkBackground:SetAlpha(0.7);
+			GuildInstanceDifficulty.emblem:SetPoint("TOPLEFT", 12, -10);
 		end
+		GuildInstanceDifficultyText:ClearAllPoints();
+		if ( isHeroic or isChallengeMode ) then
+			local symbolTexture;
+			if ( isChallengeMode ) then
+				symbolTexture = GuildInstanceDifficultyChallengeModeTexture;
+				GuildInstanceDifficultyHeroicTexture:Hide();
+			else
+				symbolTexture = GuildInstanceDifficultyHeroicTexture;
+				GuildInstanceDifficultyChallengeModeTexture:Hide();
+			end
+			-- the 1 looks a little off when text is centered
+			if ( instanceGroupSize < 10 ) then
+				symbolTexture:SetPoint("BOTTOMLEFT", 11, 7);
+				GuildInstanceDifficultyText:SetPoint("BOTTOMLEFT", 23, 8);
+			elseif ( instanceGroupSize > 19 ) then
+				symbolTexture:SetPoint("BOTTOMLEFT", 8, 7);
+				GuildInstanceDifficultyText:SetPoint("BOTTOMLEFT", 20, 8);
+			else
+				symbolTexture:SetPoint("BOTTOMLEFT", 8, 7);
+				GuildInstanceDifficultyText:SetPoint("BOTTOMLEFT", 19, 8);
+			end
+			symbolTexture:Show();
+		else
+			GuildInstanceDifficultyHeroicTexture:Hide();
+			GuildInstanceDifficultyChallengeModeTexture:Hide();
+			GuildInstanceDifficultyText:SetPoint("BOTTOM", 2, 8);
+		end
+		MiniMapInstanceDifficulty:Hide();
+		SetSmallGuildTabardTextures("player", GuildInstanceDifficulty.emblem, GuildInstanceDifficulty.background, GuildInstanceDifficulty.border);
+		GuildInstanceDifficulty:Show();
+		MiniMapChallengeMode:Hide();
+	elseif ( isChallengeMode ) then
+		MiniMapChallengeMode:Show();
+		MiniMapInstanceDifficulty:Hide();
+		GuildInstanceDifficulty:Hide();
+	elseif ( instanceType == "raid" or isHeroic ) then
+		MiniMapInstanceDifficultyText:SetText(instanceGroupSize);
+		-- the 1 looks a little off when text is centered
+		local xOffset = 0;
+		if ( instanceGroupSize >= 10 and instanceGroupSize <= 19 ) then
+			xOffset = -1;
+		end
+		if ( isHeroic ) then
+			MiniMapInstanceDifficultyTexture:SetTexCoord(0, 0.25, 0.0703125, 0.4140625);
+			MiniMapInstanceDifficultyText:SetPoint("CENTER", xOffset, -9);
+		else
+			MiniMapInstanceDifficultyTexture:SetTexCoord(0, 0.25, 0.5703125, 0.9140625);
+			MiniMapInstanceDifficultyText:SetPoint("CENTER", xOffset, 5);
+		end
+		MiniMapInstanceDifficulty:Show();
+		GuildInstanceDifficulty:Hide();
+		MiniMapChallengeMode:Hide();
 	else
 		MiniMapInstanceDifficulty:Hide();
 		GuildInstanceDifficulty:Hide();
+		MiniMapChallengeMode:Hide();
 	end
-end
-
-function _GetPlayerDifficultyMenuOptions()
-	return selectedRaidDifficulty, allowedRaidDifficulty;
 end
 
 function GuildInstanceDifficulty_OnEnter(self)

@@ -1,4 +1,3 @@
-
 function SetItemRef(link, text, button, chatFrame)
 	if ( strsub(link, 1, 6) == "player" ) then
 		local namelink, isGMLink;
@@ -37,12 +36,6 @@ function SetItemRef(link, text, button, chatFrame)
 					_G[staticPopup.."EditBox"]:SetText(name);
 					return;
 				end
-				staticPopup = StaticPopup_Visible("ADD_TEAMMEMBER");
-				if ( staticPopup ) then
-					-- If add ignore dialog is up then enter the name into the editbox
-					_G[staticPopup.."EditBox"]:SetText(name);
-					return;
-				end
 				staticPopup = StaticPopup_Visible("ADD_RAIDMEMBER");
 				if ( staticPopup ) then
 					-- If add ignore dialog is up then enter the name into the editbox
@@ -59,7 +52,7 @@ function SetItemRef(link, text, button, chatFrame)
 				elseif ( HelpFrameOpenTicketEditBox:IsVisible() ) then
 					HelpFrameOpenTicketEditBox:Insert(name);
 				else
-					SendWho(WHO_TAG_NAME..name);					
+					SendWho(WHO_TAG_EXACT..name);
 				end
 				
 			elseif ( button == "RightButton" and (not isGMLink) ) then
@@ -103,12 +96,6 @@ function SetItemRef(link, text, button, chatFrame)
 					_G[staticPopup.."EditBox"]:SetText(name);
 					return;
 				end
-				staticPopup = StaticPopup_Visible("ADD_TEAMMEMBER");
-				if ( staticPopup ) then
-					-- If add ignore dialog is up then enter the name into the editbox
-					_G[staticPopup.."EditBox"]:SetText(name);
-					return;
-				end
 				staticPopup = StaticPopup_Visible("ADD_RAIDMEMBER");
 				if ( staticPopup ) then
 					-- If add ignore dialog is up then enter the name into the editbox
@@ -132,7 +119,7 @@ function SetItemRef(link, text, button, chatFrame)
 				end
 			else
 				if ( not BNIsSelf(presenceID) ) then
-					ChatFrame_SendTell(name, chatFrame);
+					ChatFrame_SendSmartTell(name, chatFrame);
 				end
 			end
 		end
@@ -158,6 +145,8 @@ function SetItemRef(link, text, button, chatFrame)
 				if ( BNGetConversationInfo(chatTarget) ) then
 					ChatFrame_OpenChat("/"..(chatTarget + MAX_WOW_CHAT_CHANNELS), chatFrame);
 				end
+			elseif ( strupper(chatType) == "PET_BATTLE_COMBAT_LOG" or strupper(chatType) == "PET_BATTLE_INFO" ) then
+				--Don't do anything
 			else
 				ChatFrame_OpenChat("/"..chatType, chatFrame);
 			end
@@ -178,7 +167,7 @@ function SetItemRef(link, text, button, chatFrame)
 		LevelUpDisplay_ShowSideDisplay(tonumber(level), _G[levelUpType], arg1);
 		return;
 	elseif ( strsub(link, 1, 6) == "pvpbgs" ) then
-		TogglePVPFrame();
+		TogglePVPUI();
 		return;
 	elseif ( strsub(link, 1, 3) == "lfd" ) then
 		ToggleLFDParentFrame();
@@ -188,9 +177,6 @@ function SetItemRef(link, text, button, chatFrame)
 		return;
 	elseif ( strsub(link, 1, 10) == "talentpane" ) then
 		ToggleTalentFrame();
-		return;
-	elseif ( strsub(link, 1, 13) == "pettalentpane" ) then
-		TogglePetTalentFrame();
 		return;
 	elseif ( strsub(link, 1, 7) == "journal" ) then
 		if ( not HandleModifiedItemClick(GetFixedLink(text)) ) then
@@ -203,6 +189,28 @@ function SetItemRef(link, text, button, chatFrame)
 	elseif ( strsub(link, 1, 8) == "urlIndex" ) then
 		local _, index = strsplit(":", link);
 		LoadURLIndex(tonumber(index));
+		return;
+	elseif ( strsub(link, 1, 11) == "lootHistory" ) then
+		local _, rollID = strsplit(":", link);
+		LootHistoryFrame_ToggleWithRoll(LootHistoryFrame, tonumber(rollID), chatFrame);
+		return;
+	elseif ( strsub(link, 1, 13) == "battlePetAbil" ) then
+		local _, abilityID, maxHealth, power, speed = strsplit(":", link);
+		if ( IsModifiedClick() ) then
+			local fixedLink = GetFixedLink(text);
+			HandleModifiedItemClick(fixedLink);
+		else
+			FloatingPetBattleAbility_Show(tonumber(abilityID), tonumber(maxHealth), tonumber(power), tonumber(speed));
+		end
+		return;
+	elseif ( strsub(link, 1, 9) == "battlepet" ) then
+		local _, speciesID, level, breedQuality, maxHealth, power, speed, battlePetID = strsplit(":", link);
+		if ( IsModifiedClick() ) then
+			local fixedLink = GetFixedLink(text);
+			HandleModifiedItemClick(fixedLink);
+		else
+			FloatingBattlePet_Toggle(tonumber(speciesID), tonumber(level), tonumber(breedQuality), tonumber(maxHealth), tonumber(power), tonumber(speed), string.gsub(string.gsub(text, "^(.*)%[", ""), "%](.*)$", ""), battlePetID);
+		end
 		return;
 	end
     
@@ -235,9 +243,23 @@ function GetFixedLink(text)
 		elseif ( strsub(text, startLink + 2, startLink + 13) == "instancelock" ) then
 			return (gsub(text, "(|H.+|h.+|h)", "|cffff8000%1|r", 1));
 		elseif ( strsub(text, startLink + 2, startLink + 8) == "journal" ) then
-			return gsub(text, "(|H.+|h.+|h)", "|cff66bbff%1|r", 1);
+			return (gsub(text, "(|H.+|h.+|h)", "|cff66bbff%1|r", 1));
+		elseif ( strsub(text, startLink + 2, startLink + 14) == "battlePetAbil" ) then
+			return (gsub(text, "(|H.+|h.+|h)", "|cff4e96f7%1|r", 1));
+		elseif ( strsub(text, startLink + 2, startLink + 10) == "battlepet" ) then
+			return (gsub(text, "(|H.+|h.+|h)", "|cffffd200%1|r", 1)); -- s_defaultColorString (yellow)
 		end
 	end
 	--Nothing to change.
 	return text;
+end
+
+function GetBattlePetAbilityHyperlink(abilityID, maxHealth, power, speed)
+	local id, name = C_PetBattles.GetAbilityInfoByID(abilityID);
+	if ( name ) then
+		return format("|cff4e96f7|HbattlePetAbil:%d:%d:%d:%d|h[%s]|h|r", abilityID, maxHealth or 100, power or 0, speed or 0, name);
+	else
+		GMError("Attempt to link ability when we don't have record.");
+		return "";
+	end
 end

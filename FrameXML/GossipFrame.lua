@@ -4,6 +4,7 @@ NUMGOSSIPBUTTONS = 32;
 function GossipFrame_OnLoad(self)
 	self:RegisterEvent("GOSSIP_SHOW");
 	self:RegisterEvent("GOSSIP_CLOSED");
+	self:RegisterEvent("QUEST_LOG_UPDATE");
 end
 
 function GossipFrame_OnEvent(self, event, ...)
@@ -24,9 +25,12 @@ function GossipFrame_OnEvent(self, event, ...)
 				return;
 			end
 		end
+		NPCFriendshipStatusBar_Update(self);
 		GossipFrameUpdate();
 	elseif ( event == "GOSSIP_CLOSED" ) then
 		HideUIPanel(self);
+	elseif ( event == "QUEST_LOG_UPDATE" and GossipFrame.hasActiveQuests ) then
+		GossipFrameUpdate();
 	end
 end
 
@@ -71,8 +75,8 @@ function GossipFrameAvailableQuestsUpdate(...)
 	local titleButton;
 	local titleIndex = 1;
 	local titleButtonIcon;
-	local isTrivial, isDaily, isRepeatable;
-	for i=1, select("#", ...), 5 do
+	local isTrivial, isDaily, isRepeatable, isLegendary;
+	for i=1, select("#", ...), 6 do
 		if ( GossipFrame.buttonIndex > NUMGOSSIPBUTTONS ) then
 			message("This NPC has too many quests and/or gossip options.");
 		end
@@ -81,7 +85,10 @@ function GossipFrameAvailableQuestsUpdate(...)
 		isTrivial = select(i+2, ...);
 		isDaily = select(i+3, ...);
 		isRepeatable = select(i+4, ...);
-		if ( isDaily ) then
+		isLegendary = select(i+5, ...);
+		if ( isLegendary ) then
+			titleButtonIcon:SetTexture("Interface\\GossipFrame\\AvailableLegendaryQuestIcon");
+		elseif ( isDaily ) then
 			titleButtonIcon:SetTexture("Interface\\GossipFrame\\DailyQuestIcon");
 		elseif ( isRepeatable ) then
 			titleButtonIcon:SetTexture("Interface\\GossipFrame\\DailyActiveQuestIcon");
@@ -113,7 +120,9 @@ function GossipFrameActiveQuestsUpdate(...)
 	local titleButton;
 	local titleIndex = 1;
 	local titleButtonIcon;
-	for i=1, select("#", ...), 4 do
+	local numActiveQuestData = select("#", ...);
+	GossipFrame.hasActiveQuests = (numActiveQuestData > 0);
+	for i=1, numActiveQuestData, 5 do
 		if ( GossipFrame.buttonIndex > NUMGOSSIPBUTTONS ) then
 			message("This NPC has too many quests and/or gossip options.");
 		end
@@ -130,7 +139,11 @@ function GossipFrameActiveQuestsUpdate(...)
 		titleButton:SetID(titleIndex);
 		titleButton.type="Active";
 		if ( select(i+3, ...) ) then
-			titleButtonIcon:SetTexture("Interface\\GossipFrame\\ActiveQuestIcon");
+			if ( select(i+4, ...) ) then
+				titleButtonIcon:SetTexture("Interface\\GossipFrame\\ActiveLegendaryQuestIcon");
+			else
+				titleButtonIcon:SetTexture("Interface\\GossipFrame\\ActiveQuestIcon");
+			end
 		else
 			titleButtonIcon:SetTexture("Interface\\GossipFrame\\IncompleteQuestIcon");
 		end		
@@ -169,4 +182,30 @@ end
 
 function GossipResize(titleButton)
 	titleButton:SetHeight( titleButton:GetTextHeight() + 2);
+end
+
+function NPCFriendshipStatusBar_Update(frame)
+	local id, rep, maxRep, name, text, texture, reaction, threshold, nextThreshold = GetFriendshipReputation();
+	if ( id and id > 0 ) then
+		local statusBar = NPCFriendshipStatusBar;
+		statusBar:SetParent(frame);
+		-- if max rank, make it look like a full bar
+		if ( not nextThreshold ) then
+			threshold, nextThreshold, rep = 0, 1, 1;
+		end
+		if ( texture ) then
+			statusBar.icon:SetTexture(texture);
+		else
+			statusBar.icon:SetTexture("Interface\\Common\\friendship-heart");
+		end
+		statusBar:SetMinMaxValues(threshold, nextThreshold);
+		statusBar:SetValue(rep);
+		statusBar:Show();
+	else
+		NPCFriendshipStatusBar:Hide();
+	end
+end
+
+function NPCFriendshipStatusBar_OnEnter(self)
+	ShowFriendshipReputationTooltip(nil, self, "ANCHOR_BOTTOMRIGHT");
 end

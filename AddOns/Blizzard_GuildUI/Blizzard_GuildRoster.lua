@@ -1,5 +1,5 @@
-GUILD_DETAIL_NORM_HEIGHT = 187;
-GUILD_DETAIL_OFFICER_HEIGHT = 240;
+GUILD_DETAIL_NORM_HEIGHT = 175;
+GUILD_DETAIL_OFFICER_HEIGHT = 228;
 local GUILD_ROSTER_MAX_COLUMNS = 5;
 local GUILD_ROSTER_MAX_STRINGS = 4;
 local GUILD_ROSTER_BAR_MAX = 239;
@@ -17,6 +17,7 @@ local GUILD_ROSTER_COLUMNS = {
 	pvp = { "level", "class", "name", "bgrating", "arenarating" },
 	achievement = { "level", "class", "wideName", "achievement" },
 	tradeskill = { "wideName", "zone", "skill" },
+	reputation = { "level", "class", "wideName", "reputation" },
 };
 
 -- global for localization changes
@@ -35,6 +36,7 @@ GUILD_ROSTER_COLUMN_DATA = {
 	totalxp = { width = 144, text = GUILD_XP_TOTAL, stringJustify="RIGHT", hasBar = true },
 	achievement = { width = 144, text = ACHIEVEMENT_POINTS, stringJustify="RIGHT", sortType="achievementpoints", hasBar = true },
 	skill = { width = 63, text = SKILL_POINTS_ABBR, stringJustify="LEFT" },
+	reputation = { width = 144, text = REPUTATION, stringJustify="LEFT" },
 };
 
 local MOBILE_BUSY_ICON = "|TInterface\\ChatFrame\\UI-ChatIcon-ArmoryChat-BusyMobile:14:14:0:0:16:16:0:16:0:16|t";
@@ -53,6 +55,9 @@ function GuildRosterFrame_OnLoad(self)
 	GuildRoster_SetView(GetCVar("guildRosterView"));
 	SetGuildRosterSelection(0);
 	UIDropDownMenu_SetSelectedValue(GuildRosterViewDropdown, currentGuildView);
+	-- right-click dropdown
+	GuildMemberDropDown.displayMode = "MENU";
+
 	self.doRecipeQuery = true;
 end
 
@@ -126,7 +131,7 @@ function GuildRoster_Update()
 	local buttons = scrollFrame.buttons;
 	local numButtons = #buttons;
 	local button, index, class;
-	local totalMembers, onlineMembers = GetNumGuildMembers();
+	local totalMembers, onlineMembers, onlineAndMobileMembers = GetNumGuildMembers();
 	local selectedGuildMember = GetGuildRosterSelection();
 	
 	if ( currentGuildView == "tradeskill" ) then
@@ -153,8 +158,14 @@ function GuildRoster_Update()
 		else
 			GuildMemberDetailName:SetText(GuildFrame.selectedName);
 		end
-		GuildMemberDetailLevel:SetFormattedText(FRIENDS_LEVEL_TEMPLATE, level, class);
-		GuildMemberDetailZoneText:SetText(isMobile and REMOTE_CHAT or zone);
+		if ( level and class) then
+			GuildMemberDetailLevel:SetFormattedText(FRIENDS_LEVEL_TEMPLATE, level, class);
+		else
+			GuildMemberDetailLevel:SetText("");
+		end
+		local zoneText = zone;
+		if(isMobile and not online) then zoneText = REMOTE_CHAT; end;
+		GuildMemberDetailZoneText:SetText(zoneText);
 		GuildMemberDetailRankText:SetText(rank);
 		if ( online ) then
 			GuildMemberDetailOnlineText:SetText(GUILD_ONLINE_LABEL);
@@ -200,11 +211,11 @@ function GuildRoster_Update()
 			-- Resize detail frame
 			GuildMemberDetailOfficerNoteLabel:Show();
 			GuildMemberOfficerNoteBackground:Show();
-			GuildMemberDetailFrame:SetHeight(GUILD_DETAIL_OFFICER_HEIGHT + GuildMemberDetailRankLabel:GetHeight());
+			GuildMemberDetailFrame:SetHeight(GUILD_DETAIL_OFFICER_HEIGHT + GuildMemberDetailName:GetHeight() + GuildMemberDetailRankLabel:GetHeight());
 		else
 			GuildMemberDetailOfficerNoteLabel:Hide();
 			GuildMemberOfficerNoteBackground:Hide();
-			GuildMemberDetailFrame:SetHeight(GUILD_DETAIL_NORM_HEIGHT + GuildMemberDetailRankLabel:GetHeight());
+			GuildMemberDetailFrame:SetHeight(GUILD_DETAIL_NORM_HEIGHT + GuildMemberDetailName:GetHeight() + GuildMemberDetailRankLabel:GetHeight());
 		end
 
 		if ( CanGuildRemove() and ( rankIndex >= 1 ) and ( rankIndex > guildRankIndex ) ) then
@@ -226,19 +237,21 @@ function GuildRoster_Update()
 	local maxWeeklyXP, maxTotalXP = GetGuildRosterLargestContribution();
 	local maxAchievementsPoints = GetGuildRosterLargestAchievementPoints();
 	-- numVisible
-	local visibleMembers = onlineMembers;
+	local visibleMembers = onlineAndMobileMembers;
 	if ( GetGuildRosterShowOffline() ) then
 		visibleMembers = totalMembers;
 	end
 	for i = 1, numButtons do
 		button = buttons[i];		
 		index = offset + i;
-		local name, rank, rankIndex, level, class, zone, note, officernote, online, isAway, classFileName, achievementPoints, achievementRank, isMobile, canSoR = GetGuildRosterInfo(index);
+		local name, rank, rankIndex, level, class, zone, note, officernote, online, isAway, classFileName, achievementPoints, achievementRank, isMobile, canSoR, repStanding = GetGuildRosterInfo(index);
 		
+		local onlineOrMobile = online or isMobile;
+
 		if ( name and index <= visibleMembers ) then
 			button.guildIndex = index;
 			local displayedName = name;
-			if ( isMobile ) then
+			if ( isMobile and not online ) then
 				if (isAway == 2) then
 					displayedName = MOBILE_BUSY_ICON..displayedName;
 				elseif (isAway == 1) then
@@ -247,68 +260,63 @@ function GuildRoster_Update()
 					displayedName = ChatFrame_GetMobileEmbeddedTexture(73/255, 177/255, 73/255)..displayedName;
 				end
 			end
-			button.online = online;
+			button.online = onlineOrMobile;
 			if ( currentGuildView == "playerStatus" ) then
-				GuildRosterButton_SetStringText(button.string1, level, online)
+				GuildRosterButton_SetStringText(button.string1, level, onlineOrMobile)
 				button.icon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[classFileName]));
-				GuildRosterButton_SetStringText(button.string2, displayedName, online, classFileName)
-				GuildRosterButton_SetStringText(button.string3, isMobile and REMOTE_CHAT or zone, online)
+				GuildRosterButton_SetStringText(button.string2, displayedName, onlineOrMobile, classFileName)
+				local zoneText = zone;
+				if(isMobile and not online) then zoneText = REMOTE_CHAT; end;
+				GuildRosterButton_SetStringText(button.string3, zoneText, onlineOrMobile)
 				
 			elseif ( currentGuildView == "guildStatus" ) then
-				GuildRosterButton_SetStringText(button.string1, displayedName, online, classFileName)
-				GuildRosterButton_SetStringText(button.string2, rank, online)
-				GuildRosterButton_SetStringText(button.string3, note, online)
+				GuildRosterButton_SetStringText(button.string1, displayedName, onlineOrMobile, classFileName)
+				GuildRosterButton_SetStringText(button.string2, rank, onlineOrMobile)
+				GuildRosterButton_SetStringText(button.string3, note, onlineOrMobile)
 				
-				if ( online ) then
-					GuildRosterButton_SetStringText(button.string4, GUILD_ONLINE_LABEL, online);					
+				if ( onlineOrMobile ) then
+					GuildRosterButton_SetStringText(button.string4, GUILD_ONLINE_LABEL, onlineOrMobile);					
 				else
-					GuildRosterButton_SetStringText(button.string4, GuildRoster_GetLastOnline(index), online);
+					GuildRosterButton_SetStringText(button.string4, GuildRoster_GetLastOnline(index), onlineOrMobile);
 				end
 			elseif ( currentGuildView == "weeklyxp" ) then
 				local weeklyXP, totalXP, weeklyRank, totalRank = GetGuildRosterContribution(index);
-				GuildRosterButton_SetStringText(button.string1, level, online)
+				GuildRosterButton_SetStringText(button.string1, level, onlineOrMobile)
 				button.icon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[classFileName]));
-				GuildRosterButton_SetStringText(button.string2, displayedName, online, classFileName)
-				GuildRosterButton_SetStringText(button.string3, weeklyXP, online)
+				GuildRosterButton_SetStringText(button.string2, displayedName, onlineOrMobile, classFileName)
+				GuildRosterButton_SetStringText(button.string3, weeklyXP, onlineOrMobile)
 				if ( weeklyXP == 0 ) then
 					button.barTexture:Hide();
 				else
 					button.barTexture:SetWidth(weeklyXP / maxWeeklyXP * GUILD_ROSTER_BAR_MAX);
 					button.barTexture:Show();
 				end
-				GuildRosterButton_SetStringText(button.barLabel, "#"..weeklyRank, online);
+				GuildRosterButton_SetStringText(button.barLabel, "#"..weeklyRank, onlineOrMobile);
 			elseif ( currentGuildView == "totalxp" ) then
 				local weeklyXP, totalXP, weeklyRank, totalRank = GetGuildRosterContribution(index);
-				GuildRosterButton_SetStringText(button.string1, level, online);
+				GuildRosterButton_SetStringText(button.string1, level, onlineOrMobile);
 				button.icon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[classFileName]));
-				GuildRosterButton_SetStringText(button.string2, displayedName, online, classFileName);
-				GuildRosterButton_SetStringText(button.string3, totalXP, online);
+				GuildRosterButton_SetStringText(button.string2, displayedName, onlineOrMobile, classFileName);
+				GuildRosterButton_SetStringText(button.string3, totalXP, onlineOrMobile);
 				if ( totalXP == 0 ) then
 					button.barTexture:Hide();
 				else
 					button.barTexture:SetWidth(totalXP / maxTotalXP * GUILD_ROSTER_BAR_MAX);
 					button.barTexture:Show();
 				end
-				GuildRosterButton_SetStringText(button.barLabel, "#"..totalRank, online);			
+				GuildRosterButton_SetStringText(button.barLabel, "#"..totalRank, onlineOrMobile);			
 			elseif ( currentGuildView == "pve" ) then
-				GuildRosterButton_SetStringText(button.string1, level, online);
+				GuildRosterButton_SetStringText(button.string1, level, onlineOrMobile);
 				button.icon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[classFileName]));
-				GuildRosterButton_SetStringText(button.string2, displayedName, online, classFileName);
-				GuildRosterButton_SetStringText(button.string3, valor, online);
-				GuildRosterButton_SetStringText(button.string4, hero, online);
-			elseif ( currentGuildView == "pvp" ) then
-				local bgRating, arenaRating, arenaTeam = GetGuildRosterPVPRatings(index);
-				GuildRosterButton_SetStringText(button.string1, level, online);
-				button.icon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[classFileName]));
-				GuildRosterButton_SetStringText(button.string2, displayedName, online, classFileName);
-				GuildRosterButton_SetStringText(button.string3, bgRating, online);
-				GuildRosterButton_SetStringText(button.string4, string.format(GUILD_ROSTER_ARENA_RATING, arenaRating, arenaTeam, arenaTeam), online);
+				GuildRosterButton_SetStringText(button.string2, displayedName, onlineOrMobile, classFileName);
+				GuildRosterButton_SetStringText(button.string3, valor, onlineOrMobile);
+				GuildRosterButton_SetStringText(button.string4, hero, onlineOrMobile);
 			elseif ( currentGuildView == "achievement" ) then
-				GuildRosterButton_SetStringText(button.string1, level, online);
+				GuildRosterButton_SetStringText(button.string1, level, onlineOrMobile);
 				button.icon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[classFileName]));
-				GuildRosterButton_SetStringText(button.string2, displayedName, online, classFileName);
+				GuildRosterButton_SetStringText(button.string2, displayedName, onlineOrMobile, classFileName);
 				if ( achievementPoints >= 0 ) then
-					GuildRosterButton_SetStringText(button.string3, achievementPoints, online);
+					GuildRosterButton_SetStringText(button.string3, achievementPoints, onlineOrMobile);
 					if ( achievementPoints == 0 ) then
 						button.barTexture:Hide();
 					else
@@ -316,10 +324,15 @@ function GuildRoster_Update()
 						button.barTexture:Show();
 					end
 				else
-					GuildRosterButton_SetStringText(button.string3, NO_ROSTER_ACHIEVEMENT_POINTS, online);
+					GuildRosterButton_SetStringText(button.string3, NO_ROSTER_ACHIEVEMENT_POINTS, onlineOrMobile);
 					button.barTexture:Hide();
 				end
-				GuildRosterButton_SetStringText(button.barLabel, "#"..achievementRank, online);
+				GuildRosterButton_SetStringText(button.barLabel, "#"..achievementRank, onlineOrMobile);
+			elseif ( currentGuildView == "reputation" ) then
+				GuildRosterButton_SetStringText(button.string1, level, onlineOrMobile)
+				button.icon:SetTexCoord(unpack(CLASS_ICON_TCOORDS[classFileName]));
+				GuildRosterButton_SetStringText(button.string2, displayedName, onlineOrMobile, classFileName);
+				GuildRosterButton_SetStringText(button.string3, GetText("FACTION_STANDING_LABEL"..repStanding, gender), onlineOrMobile);
 			end
 			button:Show();
 			if ( mod(index, 2) == 0 ) then
@@ -350,26 +363,48 @@ function GuildRosterButton_OnClick(self, button)
 				GetGuildMemberRecipes(playerName, skillID);
 			end
 		else
-			FriendsFrame_ShowDropdown(playerName, online, nil, nil, nil, nil, isMobile);
+			GuildRoster_ShowMemberDropDown(playerName, online, isMobile);
 		end
 	else
 		if ( button == "LeftButton" ) then
 			if ( GuildMemberDetailFrame:IsShown() and self.guildIndex == GuildFrame.selectedGuildMember ) then
 				SetGuildRosterSelection(0);
 				GuildFrame.selectedGuildMember = 0;
+				PlaySound("igCharacterInfoClose");
 				GuildMemberDetailFrame:Hide();
 			else
 				SetGuildRosterSelection(self.guildIndex);
 				GuildFrame.selectedGuildMember = self.guildIndex;
+				PlaySound("igCharacterInfoOpen");
 				GuildFramePopup_Show(GuildMemberDetailFrame);
 				CloseDropDownMenus();
 			end
 			GuildRoster_Update();
 		else
 			local name, rank, rankIndex, level, class, zone, note, officernote, online, isAway, classFileName, achievementPoints, achievementRank, isMobile = GetGuildRosterInfo(self.guildIndex);
-			FriendsFrame_ShowDropdown(name, online, nil, nil, nil, nil, isMobile);
+			GuildRoster_ShowMemberDropDown(name, online, isMobile);
 		end
 	end
+end
+
+function GuildRoster_ShowMemberDropDown(name, online, isMobile)
+	local initFunc = GuildMemberDropDown_Initialize;
+	if ( not online and not isMobile ) then
+		initFunc = GuildMemberOfflineDropDown_Initialize;
+	end
+
+	GuildMemberDropDown.name = name;
+	GuildMemberDropDown.isMobile = isMobile;
+	GuildMemberDropDown.initialize = initFunc;
+	ToggleDropDownMenu(1, nil, GuildMemberDropDown, "cursor");
+end
+
+function GuildMemberDropDown_Initialize()
+	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "GUILD", nil, GuildMemberDropDown.name);
+end
+
+function GuildMemberOfflineDropDown_Initialize()
+	UnitPopup_ShowMenu(UIDROPDOWNMENU_OPEN_MENU, "GUILD_OFFLINE", nil, GuildMemberDropDown.name);
 end
 
 function GuildRoster_UpdateTradeSkills()
@@ -442,8 +477,10 @@ function GuildRoster_UpdateTradeSkills()
 						playerName = ChatFrame_GetMobileEmbeddedTexture(73/255, 177/255, 73/255)..playerName;
 					end
 				end
+				local zoneText = zone;
+				if(isMobile and not online) then zoneText = REMOTE_CHAT; end;
 				GuildRosterButton_SetStringText(button.string1, playerName, online, classFileName);
-				GuildRosterButton_SetStringText(button.string2, isMobile and REMOTE_CHAT or zone, online);
+				GuildRosterButton_SetStringText(button.string2, zoneText, online);
 				GuildRosterButton_SetStringText(button.string3, "["..skill.."]", online);
 				button.header:Hide();
 				button:Show();
@@ -466,6 +503,7 @@ function GuildRoster_UpdateTradeSkills()
 end
 
 function GuildRosterTradeSkillHeader_OnClick(self)
+	PlaySound("igMainMenuOptionCheckBoxOn");
 	if ( self.collapsed ) then
 		ExpandGuildTradeSkillHeader(self.skillID);
 	else
@@ -583,6 +621,9 @@ function GuildRosterViewDropdown_Initialize()
 	info.text = TRADE_SKILLS;
 	info.value = "tradeskill";
 	UIDropDownMenu_AddButton(info);	
+	info.text = GUILD_REPUTATION;
+	info.value = "reputation";
+	UIDropDownMenu_AddButton(info);
 	
 	UIDropDownMenu_SetSelectedValue(GuildRosterViewDropdown, currentGuildView);
 end
